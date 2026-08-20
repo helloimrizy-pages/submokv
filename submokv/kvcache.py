@@ -518,7 +518,13 @@ class RetentionController:
             # A policy whose retained set depends only on position gives every
             # layer at the same ratio the same mask, so it is built once.
             cacheable = not self.policy.needs_attention_scores
-            cache_key = (ratio, key_length, int(query_positions[0]), int(query_positions.numel()))
+            cache_key = (
+                ratio,
+                key_length,
+                int(query_positions[0]),
+                int(query_positions.numel()),
+                self._exempt_below,
+            )
             allowed = self._mask_cache.get(cache_key) if cacheable else None
             if allowed is None:
                 allowed = self.policy.allowed(
