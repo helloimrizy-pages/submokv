@@ -93,3 +93,70 @@ def test_spread_reports_range_and_deviation() -> None:
     assert result["range"] == 3.0
     assert result["count"] == 3
     assert _spread([])["count"] == 0
+
+
+def test_diagnostic_0_runs_and_reports_a_spread(tiny_utility) -> None:
+    """The whole diagnostic path runs, including the per expert granularity."""
+    from submokv.diagnostics import diagnostic_0_sensitivity
+
+    result = diagnostic_0_sensitivity(
+        tiny_utility, per_expert_layers=(0,), per_expert_sample=2, expert_group_size=2
+    )
+    layers = tiny_utility.ground_set.model.num_hidden_layers
+    assert len(result["per_layer_weight"]) == layers * 4
+    assert len(result["per_layer_kv"]) == layers * 3
+    assert len(result["per_expert_weight"]) == 2
+    assert len(result["expert_group_weight"]) == 2
+    assert result["reference_perplexity"] > 0
+    assert set(result["summary"]["weight_spread_by_bits"]) == {"2", "3", "4", "8"}
+    # The 2-bit probe sits outside the search space and is labelled as such.
+    two_bit = [r for r in result["per_layer_weight"] if r["bits"] == 2]
+    assert all(not r["in_ground_set"] for r in two_bit)
+    assert all(r["in_ground_set"] for r in result["per_layer_weight"] if r["bits"] == 4)
+
+
+def test_dropping_a_unit_from_the_top_does_not_improve_perplexity(tiny_utility) -> None:
+    """A random model has no reason to prefer a lower tier, but the sign is worth pinning."""
+    from submokv.diagnostics import diagnostic_0_sensitivity
+
+    result = diagnostic_0_sensitivity(
+        tiny_utility, per_expert_layers=(0,), per_expert_sample=1, expert_group_size=4
+    )
+    assert all(row["perplexity"] > 0 for row in result["per_layer_weight"])
+
+
+def test_diagnostic_1_reports_full_and_trimmed_spread(tiny_utility) -> None:
+    from submokv.diagnostics import diagnostic_1_headroom
+
+    result = diagnostic_1_headroom(tiny_utility, budget_fraction=0.9, num_samples=6, seed=0)
+    assert len(result["samples"]) == 6
+    assert result["full_spread"]["count"] == 6
+    assert result["dropped_worst"] >= 1
+    assert result["trimmed_spread"]["count"] < result["full_spread"]["count"]
+    assert result["trimmed_spread"]["range"] <= result["full_spread"]["range"]
+    assert all(s["cost_bytes"] <= result["budget_bytes"] for s in result["samples"])
+
+
+def test_diagnostic_2_reports_an_interaction_term(tiny_utility) -> None:
+    from submokv.diagnostics import diagnostic_2_interaction
+
+    result = diagnostic_2_interaction(tiny_utility, budget_fraction=0.9)
+    assert set(result["pairings"]) == {"shared_slack", "full_slack"}
+    shared = result["pairings"]["shared_slack"]
+    expected = shared["utility_joint"] - shared["utility_weight_only"] - shared["utility_kv_only"]
+    assert shared["interaction"] == pytest.approx(expected)
+    assert not shared["over_budget"]
+    assert result["batch_size"] == 1
+
+
+def test_the_utility_is_zero_at_the_base_state(tiny_utility) -> None:
+    """F(base) must be zero by construction, or every gain is measured from a moving point."""
+    assert tiny_utility.utility(tiny_utility.ground_set.base_allocation()) == 0.0
+
+
+def test_the_utility_memoizes_on_the_allocation(tiny_utility) -> None:
+    allocation = tiny_utility.ground_set.full_allocation()
+    tiny_utility.evaluate(allocation)
+    before = tiny_utility.evaluation_count
+    tiny_utility.evaluate(allocation)
+    assert tiny_utility.evaluation_count == before

@@ -101,3 +101,42 @@ def tiny_ids():
 def tiny_kv() -> KVSpec:
     """Return a KV spec whose context length matches the tiny sequence length."""
     return KVSpec(context_length=16, batch_size=1, dtype_bytes=2, sink_tokens=2)
+
+
+@pytest.fixture
+def tiny_utility(tiny_model):
+    """Return a utility function over the tiny model, wired exactly as the real one is."""
+    import torch
+
+    from submokv.kvcache import EvaluationProtocol, RecencySinkPolicy, RetentionController
+    from submokv.quantize import ExpertQuantizer
+    from submokv.utility import CalibrationSpec, SequenceStore, UtilityFunction
+
+    model_spec = ModelSpec(
+        name="tiny",
+        num_hidden_layers=TINY_ARCHITECTURE["num_hidden_layers"],
+        hidden_size=TINY_ARCHITECTURE["hidden_size"],
+        intermediate_size=TINY_ARCHITECTURE["intermediate_size"],
+        num_attention_heads=TINY_ARCHITECTURE["num_attention_heads"],
+        num_key_value_heads=TINY_ARCHITECTURE["num_key_value_heads"],
+        num_experts=TINY_ARCHITECTURE["num_experts"],
+        vocab_size=TINY_ARCHITECTURE["vocab_size"],
+        max_position_embeddings=TINY_ARCHITECTURE["max_position_embeddings"],
+    )
+    kv = KVSpec(context_length=16, batch_size=1, dtype_bytes=2, sink_tokens=2)
+    quant = QuantSpec(group_size=8, scale_bits=16, zero_point_bits=0)
+    ground = GroundSet(model_spec, kv, quant)
+
+    spec = CalibrationSpec(sequence_length=16, cheap_sequences=2, full_sequences=4, seed=0)
+    generator = torch.Generator().manual_seed(5)
+    pool = torch.randint(0, TINY_ARCHITECTURE["vocab_size"], (10, 16), generator=generator)
+    store = SequenceStore.from_windows(pool[:6], pool[6:], spec)
+
+    quantizer = ExpertQuantizer(tiny_model, quant)
+    controller = RetentionController(
+        tiny_model,
+        RecencySinkPolicy(sink_tokens=2),
+        kv,
+        EvaluationProtocol(prefill_tokens=8, chunk_size=4),
+    ).attach()
+    return UtilityFunction(tiny_model, ground, quantizer, controller, store, device="cpu")
