@@ -416,8 +416,17 @@ def build_utility(
     model_path: str | Path | None = None,
     device: str | torch.device | None = None,
     cache_dir: str | Path = "cache",
+    shard: int = 0,
+    num_shards: int = 1,
 ) -> tuple[Any, "UtilityFunction"]:
     """Load the model and assemble the utility function described by a config.
+
+    The memoization file is named for the device and dtype that produced it.
+    Different accelerators give different floating point results for the same
+    allocation, so a cache carried from one machine to another would serve
+    numbers the current machine did not produce. The shard is in the name too,
+    so workers running slices of one experiment side by side never write over
+    each other.
 
     Returns the model and the utility, so a caller that needs the model itself
     does not have to reach through the utility for it.
@@ -427,6 +436,8 @@ def build_utility(
     from .kvcache import EvaluationProtocol, RetentionController, build_policy
     from .memory import QuantSpec
     from .quantize import CheckpointMasterStore, ExpertQuantizer, MemoryMasterStore
+
+    import os
 
     ground_set = GroundSet.from_config(config)
     runtime = dict(config.get("runtime", {}))
@@ -438,6 +449,21 @@ def build_utility(
     implementation = runtime.get("attn_implementation") or (
         "eager" if policy.needs_attention_scores else "sdpa"
     )
+
+    if runtime.get("deterministic", True):
+        # F must be a deterministic function of the selected set. OLMoE's expert
+        # forward ends in index_add_, which on CUDA accumulates with atomics in
+        # an order that varies between runs, so the same allocation would score
+        # differently each time and every marginal gain would carry that noise.
+        if resolved_device.type == "cuda":
+            workspace = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
+            if workspace not in (":4096:8", ":16:8"):
+                raise RuntimeError(
+                    "set CUBLAS_WORKSPACE_CONFIG=:4096:8 in the environment before starting "
+                    "the process; cuBLAS needs it for reproducible matmuls and it cannot be "
+                    f"set afterwards (found {workspace!r})"
+                )
+        torch.use_deterministic_algorithms(True)
 
     model = AutoModelForCausalLM.from_pretrained(
         source, dtype=dtype, attn_implementation=implementation
@@ -470,6 +496,9 @@ def build_utility(
     spec = CalibrationSpec(**config.get("calibration", {}))
     store = SequenceStore(tokenizer, spec, cache_dir)
 
+    tag = f"{resolved_device.type}_{str(dtype).replace('torch.', '')}"
+    if num_shards > 1:
+        tag = f"{tag}_s{shard}of{num_shards}"
     utility = UtilityFunction(
         model=model,
         ground_set=ground_set,
@@ -477,6 +506,6 @@ def build_utility(
         controller=controller,
         store=store,
         device=resolved_device,
-        cache_path=Path(cache_dir) / f"utility_{ground_set.signature}.json",
+        cache_path=Path(cache_dir) / f"utility_{ground_set.signature}_{tag}.json",
     )
     return model, utility

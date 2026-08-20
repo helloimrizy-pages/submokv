@@ -160,3 +160,70 @@ def test_the_utility_memoizes_on_the_allocation(tiny_utility) -> None:
     before = tiny_utility.evaluation_count
     tiny_utility.evaluate(allocation)
     assert tiny_utility.evaluation_count == before
+
+
+def test_sharded_diagnostic_0_unions_to_the_unsharded_result(tiny_utility) -> None:
+    """Splitting the probe list across workers must not change the experiment."""
+    from submokv.diagnostics import diagnostic_0_sensitivity, merge_diagnostic_0
+
+    kwargs = dict(per_expert_layers=(0,), per_expert_sample=2, expert_group_size=2)
+    whole = diagnostic_0_sensitivity(tiny_utility, **kwargs)
+    shards = [
+        diagnostic_0_sensitivity(tiny_utility, shard=i, num_shards=3, **kwargs) for i in range(3)
+    ]
+    merged = merge_diagnostic_0(shards)
+
+    assert sum(s["num_probes_measured"] for s in shards) == whole["num_probes_measured"]
+    assert merged["complete"]
+    assert merged["merged_from_shards"] == [0, 1, 2]
+    for group in ("per_layer_weight", "per_layer_kv", "per_expert_weight", "expert_group_weight"):
+        by_probe = {r["probe"]: r for r in whole[group]}
+        assert {r["probe"] for r in merged[group]} == set(by_probe)
+        for row in merged[group]:
+            assert row["delta"] == by_probe[row["probe"]]["delta"]
+    assert merged["summary"] == whole["summary"]
+
+
+def test_shards_of_diagnostic_0_are_disjoint(tiny_utility) -> None:
+    from submokv.diagnostics import diagnostic_0_sensitivity
+
+    kwargs = dict(per_expert_layers=(0,), per_expert_sample=2, expert_group_size=2)
+    seen: list[set[str]] = []
+    for i in range(2):
+        result = diagnostic_0_sensitivity(tiny_utility, shard=i, num_shards=2, **kwargs)
+        seen.append({r["probe"] for g in result if isinstance(result[g], list) for r in result[g]})
+    assert seen[0] and seen[1]
+    assert not (seen[0] & seen[1])
+
+
+def test_sharded_diagnostic_1_unions_to_the_unsharded_result(tiny_utility) -> None:
+    """Per-sample seeding means sample i is the same allocation in any sharding."""
+    from submokv.diagnostics import diagnostic_1_headroom, merge_diagnostic_1
+
+    whole = diagnostic_1_headroom(tiny_utility, budget_fraction=0.9, num_samples=6, seed=0)
+    shards = [
+        diagnostic_1_headroom(
+            tiny_utility, budget_fraction=0.9, num_samples=6, seed=0, shard=i, num_shards=2
+        )
+        for i in range(2)
+    ]
+    merged = merge_diagnostic_1(shards)
+    assert merged["complete"]
+    assert [s["sample"] for s in merged["samples"]] == list(range(6))
+    assert merged["full_spread"] == whole["full_spread"]
+    assert merged["trimmed_spread"] == whole["trimmed_spread"]
+    for a, b in zip(merged["samples"], whole["samples"]):
+        assert a["perplexity"] == b["perplexity"]
+        assert a["allocation"] == b["allocation"]
+
+
+def test_merge_refuses_shards_that_disagree_on_the_reference(tiny_utility) -> None:
+    """Shards measured on different devices would silently blend two experiments."""
+    from submokv.diagnostics import diagnostic_0_sensitivity, merge_diagnostic_0
+
+    kwargs = dict(per_expert_layers=(0,), per_expert_sample=1, expert_group_size=4)
+    a = diagnostic_0_sensitivity(tiny_utility, shard=0, num_shards=2, **kwargs)
+    b = diagnostic_0_sensitivity(tiny_utility, shard=1, num_shards=2, **kwargs)
+    b["reference_perplexity"] += 0.5
+    with pytest.raises(ValueError, match="disagree on the reference"):
+        merge_diagnostic_0([a, b])

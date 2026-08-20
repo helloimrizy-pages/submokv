@@ -135,10 +135,27 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
     seed = int(config.get("seed", 0))
     if getattr(args, "sequences", None):
         config = {**config, "calibration": {**config["calibration"], "cheap_sequences": args.sequences}}
-    _, utility = build_utility(config, model_path=model_path, device=args.device)
+    if getattr(args, "master_store", None):
+        config = {**config, "runtime": {**config["runtime"], "master_store": args.master_store}}
+    shard = getattr(args, "shard", 0)
+    num_shards = getattr(args, "num_shards", 1)
+    if not 0 <= shard < num_shards:
+        raise ValueError(f"shard {shard} is not in range for {num_shards} shards")
+    _, utility = build_utility(
+        config, model_path=model_path, device=args.device, shard=shard, num_shards=num_shards
+    )
 
-    full_config = {**config, "model_path": model_path, "command": args.command}
-    with record(args.command.replace("-", "_"), full_config, seed) as entry:
+    full_config = {
+        **config,
+        "model_path": model_path,
+        "command": args.command,
+        "shard": shard,
+        "num_shards": num_shards,
+    }
+    name = args.command.replace("-", "_")
+    if num_shards > 1:
+        name = f"{name}_s{shard}of{num_shards}"
+    with record(name, full_config, seed) as entry:
         if args.command == "noise-floor" and args.paired:
             from .diagnostics import paired_noise_floor, top_retention, top_weight_plan
 
@@ -164,16 +181,54 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
                 utility,
                 per_expert_layers=[int(p) for p in args.expert_layers.split(",")],
                 per_expert_sample=args.expert_sample,
+                shard=shard,
+                num_shards=num_shards,
             )
         elif args.command == "diagnostic-1":
             entry.payload["diagnostic_1"] = diagnostic_1_headroom(
-                utility, args.budget, args.samples, seed
+                utility, args.budget, args.samples, seed, shard=shard, num_shards=num_shards
             )
         elif args.command == "diagnostic-2":
             entry.payload["diagnostic_2"] = diagnostic_2_interaction(utility, args.budget)
         entry.payload["setup"] = utility.describe()
         entry.payload["ground_set"] = utility.ground_set.describe()
         entry.payload["evaluation_count"] = utility.evaluation_count
+
+
+def _merge_shards(args: argparse.Namespace, config: dict[str, Any]) -> None:
+    """Combine shard records for one diagnostic into the whole experiment's result."""
+    from .diagnostics import merge_diagnostic_0, merge_diagnostic_1
+    from .records import load_records
+
+    mergers = {"diagnostic_0": merge_diagnostic_0, "diagnostic_1": merge_diagnostic_1}
+    if args.name not in mergers:
+        raise ValueError(f"no merge rule for {args.name!r}; choose one of {sorted(mergers)}")
+
+    found = [r for r in load_records(args.results_dir) if r["name"].startswith(f"{args.name}_s")]
+    if not found:
+        raise FileNotFoundError(f"no shard records for {args.name!r} in {args.results_dir}")
+    commits = {r["git_commit"] for r in found}
+    if len(commits) > 1:
+        raise ValueError(f"shard records span more than one commit: {sorted(commits)}")
+
+    payloads = [r["payload"][args.name] for r in found]
+    merged = mergers[args.name](payloads)
+    with record(
+        f"{args.name}__merged",
+        {**config, "merged_from": [r["name"] for r in found]},
+        int(config.get("seed", 0)),
+        args.results_dir,
+    ) as entry:
+        entry.payload[args.name] = merged
+        entry.payload["setup"] = found[0]["payload"].get("setup", {})
+        entry.payload["evaluation_count"] = sum(
+            r["payload"].get("evaluation_count", 0) for r in found
+        )
+    status = "complete" if merged.get("complete", True) else "INCOMPLETE"
+    print(f"merged {len(found)} shard(s) of {args.name}: {status}")
+    for key in ("num_probes_measured", "num_probes_total", "num_samples_measured"):
+        if key in merged:
+            print(f"  {key}: {merged[key]}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -201,6 +256,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             default=None,
             help="override calibration.cheap_sequences for this run",
         )
+        sub.add_argument(
+            "--master-store",
+            type=str,
+            default=None,
+            choices=["memory", "checkpoint"],
+            help="where the unmodified expert weights are read from",
+        )
+        sub.add_argument("--shard", type=int, default=0, help="index of this worker")
+        sub.add_argument(
+            "--num-shards",
+            type=int,
+            default=1,
+            help="split the work across this many workers, one per accelerator",
+        )
         if name == "noise-floor":
             sub.add_argument("--sizes", type=str, default="16,32,64")
             sub.add_argument("--subsamples", type=int, default=6)
@@ -217,6 +286,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if name == "diagnostic-1":
             sub.add_argument("--samples", type=int, default=30)
 
+    merge = subparsers.add_parser("merge", help="combine shard records into one result")
+    merge.add_argument("--name", type=str, required=True, help="diagnostic_0 or diagnostic_1")
+    merge.add_argument("--results-dir", type=Path, default=Path("results"))
+
     args = parser.parse_args(argv)
     config = load_config(args.config)
     ground_set = GroundSet.from_config(config)
@@ -227,6 +300,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_budgets(ground_set, config.get("budgets", {}).get("fractions", []))
     elif args.command == "describe":
         print(json.dumps(ground_set.describe(), indent=args.indent))
+    elif args.command == "merge":
+        _merge_shards(args, config)
     else:
         _run_diagnostic(args, config)
     return 0

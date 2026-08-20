@@ -149,6 +149,118 @@ def noise_floor_sweep(
     return results
 
 
+def diagnostic_0_probes(
+    ground_set: GroundSet,
+    per_expert_layers: Sequence[int] = (0, 8),
+    per_expert_sample: int = 8,
+    expert_group_size: int = 8,
+) -> list[dict[str, Any]]:
+    """Return every probe Diagnostic 0 measures, in a fixed order.
+
+    The order does not depend on which shard runs it, so splitting the list
+    across workers gives each one a disjoint slice of the same experiment.
+    """
+    layers = list(range(ground_set.model.num_hidden_layers))
+    num_experts = ground_set.model.num_experts
+    top_bits = top_weight_plan(ground_set)
+    top_kv = top_retention(ground_set)
+    probes: list[dict[str, Any]] = []
+
+    for layer in layers:
+        for bits in WEIGHT_PROBE_BITS:
+            plan = top_weight_plan(ground_set)
+            plan[layer] = {expert: bits for expert in range(num_experts)}
+            probes.append(
+                {
+                    "group": "per_layer_weight",
+                    "key": f"d0.w.l{layer:02d}.b{bits}",
+                    "weight_bits": plan,
+                    "retention": dict(top_kv),
+                    "row": {"layer": layer, "bits": bits, "in_ground_set": bits in ground_set.weight_tiers},
+                }
+            )
+
+    for layer in layers:
+        for ratio in KV_PROBE_RETENTION:
+            retention = dict(top_kv)
+            retention[layer] = ratio
+            probes.append(
+                {
+                    "group": "per_layer_kv",
+                    "key": f"d0.kv.l{layer:02d}.r{ratio}",
+                    "weight_bits": top_bits,
+                    "retention": retention,
+                    "row": {"layer": layer, "retention": ratio},
+                }
+            )
+
+    # A single expert of sixty four carries little of a layer, so the most
+    # aggressive bit width is used to give the signal its best chance, and
+    # contiguous groups are measured alongside single experts.
+    for layer in per_expert_layers:
+        for expert in range(min(per_expert_sample, num_experts)):
+            plan = top_weight_plan(ground_set)
+            plan[layer] = dict(plan[layer])
+            plan[layer][expert] = WEIGHT_PROBE_BITS[0]
+            probes.append(
+                {
+                    "group": "per_expert_weight",
+                    "key": f"d0.we.l{layer:02d}.e{expert:02d}.b{WEIGHT_PROBE_BITS[0]}",
+                    "weight_bits": plan,
+                    "retention": dict(top_kv),
+                    "row": {"layer": layer, "expert": expert, "bits": WEIGHT_PROBE_BITS[0]},
+                }
+            )
+        for start in range(0, num_experts, expert_group_size):
+            members = list(range(start, min(start + expert_group_size, num_experts)))
+            plan = top_weight_plan(ground_set)
+            plan[layer] = dict(plan[layer])
+            for expert in members:
+                plan[layer][expert] = WEIGHT_PROBE_BITS[1]
+            probes.append(
+                {
+                    "group": "expert_group_weight",
+                    "key": f"d0.wg.l{layer:02d}.g{start // expert_group_size}.b{WEIGHT_PROBE_BITS[1]}",
+                    "weight_bits": plan,
+                    "retention": dict(top_kv),
+                    "row": {
+                        "layer": layer,
+                        "group": start // expert_group_size,
+                        "experts": members,
+                        "bits": WEIGHT_PROBE_BITS[1],
+                    },
+                }
+            )
+    return probes
+
+
+def summarize_diagnostic_0(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return the spread of every probe family, computed over whatever rows are present."""
+    weight = payload.get("per_layer_weight", [])
+    kv = payload.get("per_layer_kv", [])
+    experts = payload.get("per_expert_weight", [])
+    groups = payload.get("expert_group_weight", [])
+    expert_layers = sorted({row["layer"] for row in experts} | {row["layer"] for row in groups})
+    return {
+        "weight_spread_by_bits": {
+            str(bits): _spread([r["delta"] for r in weight if r["bits"] == bits])
+            for bits in WEIGHT_PROBE_BITS
+        },
+        "kv_spread_by_retention": {
+            str(ratio): _spread([r["delta"] for r in kv if r["retention"] == ratio])
+            for ratio in KV_PROBE_RETENTION
+        },
+        "expert_spread_by_layer": {
+            str(layer): _spread([r["delta"] for r in experts if r["layer"] == layer])
+            for layer in expert_layers
+        },
+        "expert_group_spread_by_layer": {
+            str(layer): _spread([r["delta"] for r in groups if r["layer"] == layer])
+            for layer in expert_layers
+        },
+    }
+
+
 def diagnostic_0_sensitivity(
     utility: UtilityFunction,
     fidelity: str = CHEAP,
@@ -156,137 +268,89 @@ def diagnostic_0_sensitivity(
     per_expert_layers: Sequence[int] = (0, 8),
     per_expert_sample: int = 8,
     expert_group_size: int = 8,
+    shard: int = 0,
+    num_shards: int = 1,
 ) -> dict[str, Any]:
     """Measure how much perplexity moves when one unit is dropped from the top allocation.
 
     This is the necessary condition. If the sensitivity curves of the layers lie
     on top of each other to within the noise floor, there is nothing for any
     allocator to allocate.
+
+    With num_shards above one, this measures only its own slice of the probe
+    list. The slices are disjoint and their union is the whole experiment, so
+    merge_diagnostic_0 rebuilds the full result from the shard records.
     """
     ground_set = utility.ground_set
-    layers = list(range(ground_set.model.num_hidden_layers))
-    num_experts = ground_set.model.num_experts
-
     reference = utility.evaluate_plan(
         "d0.top", top_weight_plan(ground_set), top_retention(ground_set), fidelity, subsample
     ).perplexity
 
-    weight_rows: list[dict[str, Any]] = []
-    for layer in layers:
-        for bits in WEIGHT_PROBE_BITS:
-            plan = top_weight_plan(ground_set)
-            plan[layer] = {expert: bits for expert in range(num_experts)}
-            result = utility.evaluate_plan(
-                f"d0.w.l{layer:02d}.b{bits}", plan, top_retention(ground_set), fidelity, subsample
-            )
-            weight_rows.append(
-                {
-                    "layer": layer,
-                    "bits": bits,
-                    "perplexity": result.perplexity,
-                    "delta": result.perplexity - reference,
-                    "in_ground_set": bits in ground_set.weight_tiers,
-                }
-            )
-
-    kv_rows: list[dict[str, Any]] = []
-    for layer in layers:
-        for ratio in KV_PROBE_RETENTION:
-            retention = top_retention(ground_set)
-            retention[layer] = ratio
-            result = utility.evaluate_plan(
-                f"d0.kv.l{layer:02d}.r{ratio}",
-                top_weight_plan(ground_set),
-                retention,
-                fidelity,
-                subsample,
-            )
-            kv_rows.append(
-                {
-                    "layer": layer,
-                    "retention": ratio,
-                    "perplexity": result.perplexity,
-                    "delta": result.perplexity - reference,
-                }
-            )
-
-    # Per expert. A single expert of sixty four carries little of a layer, so
-    # the most aggressive bit width is used to give the signal its best chance,
-    # and contiguous groups are measured alongside single experts.
-    expert_rows: list[dict[str, Any]] = []
-    group_rows: list[dict[str, Any]] = []
-    for layer in per_expert_layers:
-        for expert in range(min(per_expert_sample, num_experts)):
-            plan = top_weight_plan(ground_set)
-            plan[layer] = dict(plan[layer])
-            plan[layer][expert] = WEIGHT_PROBE_BITS[0]
-            result = utility.evaluate_plan(
-                f"d0.we.l{layer:02d}.e{expert:02d}.b{WEIGHT_PROBE_BITS[0]}",
-                plan,
-                top_retention(ground_set),
-                fidelity,
-                subsample,
-            )
-            expert_rows.append(
-                {
-                    "layer": layer,
-                    "expert": expert,
-                    "bits": WEIGHT_PROBE_BITS[0],
-                    "perplexity": result.perplexity,
-                    "delta": result.perplexity - reference,
-                }
-            )
-        for group_start in range(0, num_experts, expert_group_size):
-            members = list(range(group_start, min(group_start + expert_group_size, num_experts)))
-            plan = top_weight_plan(ground_set)
-            plan[layer] = dict(plan[layer])
-            for expert in members:
-                plan[layer][expert] = WEIGHT_PROBE_BITS[1]
-            result = utility.evaluate_plan(
-                f"d0.wg.l{layer:02d}.g{group_start // expert_group_size}.b{WEIGHT_PROBE_BITS[1]}",
-                plan,
-                top_retention(ground_set),
-                fidelity,
-                subsample,
-            )
-            group_rows.append(
-                {
-                    "layer": layer,
-                    "group": group_start // expert_group_size,
-                    "experts": members,
-                    "bits": WEIGHT_PROBE_BITS[1],
-                    "perplexity": result.perplexity,
-                    "delta": result.perplexity - reference,
-                }
-            )
-
-    summary = {
-        "weight_spread_by_bits": {
-            str(bits): _spread([r["delta"] for r in weight_rows if r["bits"] == bits])
-            for bits in WEIGHT_PROBE_BITS
-        },
-        "kv_spread_by_retention": {
-            str(ratio): _spread([r["delta"] for r in kv_rows if r["retention"] == ratio])
-            for ratio in KV_PROBE_RETENTION
-        },
-        "expert_spread_by_layer": {
-            str(layer): _spread([r["delta"] for r in expert_rows if r["layer"] == layer])
-            for layer in per_expert_layers
-        },
-        "expert_group_spread_by_layer": {
-            str(layer): _spread([r["delta"] for r in group_rows if r["layer"] == layer])
-            for layer in per_expert_layers
-        },
+    probes = diagnostic_0_probes(
+        ground_set, per_expert_layers, per_expert_sample, expert_group_size
+    )
+    payload: dict[str, Any] = {
+        "per_layer_weight": [],
+        "per_layer_kv": [],
+        "per_expert_weight": [],
+        "expert_group_weight": [],
     }
+    for index, probe in enumerate(probes):
+        if index % num_shards != shard:
+            continue
+        result = utility.evaluate_plan(
+            probe["key"], probe["weight_bits"], probe["retention"], fidelity, subsample
+        )
+        row = {
+            **probe["row"],
+            "probe": probe["key"],
+            "perplexity": result.perplexity,
+            "delta": result.perplexity - reference,
+        }
+        payload[probe["group"]].append(row)
+
     return {
         "reference_perplexity": reference,
         "fidelity": fidelity,
         "subsample": subsample,
-        "per_layer_weight": weight_rows,
-        "per_layer_kv": kv_rows,
-        "per_expert_weight": expert_rows,
-        "expert_group_weight": group_rows,
-        "summary": summary,
+        "shard": shard,
+        "num_shards": num_shards,
+        "num_probes_total": len(probes),
+        "num_probes_measured": sum(len(v) for v in payload.values()),
+        **payload,
+        "summary": summarize_diagnostic_0(payload),
+    }
+
+
+def merge_diagnostic_0(shards: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Combine Diagnostic 0 shard payloads into the result the whole experiment would give."""
+    if not shards:
+        raise ValueError("no shards to merge")
+    references = {round(s["reference_perplexity"], 12) for s in shards}
+    if len(references) > 1:
+        raise ValueError(
+            f"shards disagree on the reference perplexity: {sorted(references)}; "
+            "they were not measured on the same model, device, or subsample"
+        )
+    payload: dict[str, Any] = {
+        group: sorted(
+            (row for s in shards for row in s.get(group, [])),
+            key=lambda r: r["probe"],
+        )
+        for group in ("per_layer_weight", "per_layer_kv", "per_expert_weight", "expert_group_weight")
+    }
+    measured = sum(len(v) for v in payload.values())
+    expected = shards[0]["num_probes_total"]
+    return {
+        "reference_perplexity": shards[0]["reference_perplexity"],
+        "fidelity": shards[0]["fidelity"],
+        "subsample": shards[0]["subsample"],
+        "merged_from_shards": sorted(s["shard"] for s in shards),
+        "num_probes_total": expected,
+        "num_probes_measured": measured,
+        "complete": measured == expected,
+        **payload,
+        "summary": summarize_diagnostic_0(payload),
     }
 
 
@@ -334,6 +398,8 @@ def diagnostic_1_headroom(
     fidelity: str = CHEAP,
     subsample: int = 0,
     drop_worst_fraction: float = 0.1,
+    shard: int = 0,
+    num_shards: int = 1,
 ) -> dict[str, Any]:
     """Measure the spread of perplexity across random feasible allocations at one budget.
 
@@ -344,10 +410,14 @@ def diagnostic_1_headroom(
     """
     ground_set = utility.ground_set
     plan = ground_set.plan_budget(budget_fraction)
-    generator = torch.Generator().manual_seed(seed)
 
     rows: list[dict[str, Any]] = []
     for index in range(num_samples):
+        if index % num_shards != shard:
+            continue
+        # Each sample carries its own seed, so sample i is the same allocation
+        # whichever shard draws it and however many shards there are.
+        generator = torch.Generator().manual_seed(seed * 1000003 + index)
         allocation = random_feasible_allocation(ground_set, plan.budget_bytes, generator)
         result = utility.evaluate(allocation, fidelity, subsample)
         rows.append(
@@ -366,10 +436,6 @@ def diagnostic_1_headroom(
             }
         )
 
-    values = sorted(row["perplexity"] for row in rows)
-    keep = max(2, len(values) - max(1, int(round(drop_worst_fraction * len(values)))))
-    # Higher perplexity is worse, so the worst allocations sit at the end.
-    trimmed = values[:keep]
     return {
         "budget_fraction": budget_fraction,
         "budget_bytes": plan.budget_bytes,
@@ -377,10 +443,58 @@ def diagnostic_1_headroom(
         "fidelity": fidelity,
         "subsample": subsample,
         "seed": seed,
+        "shard": shard,
+        "num_shards": num_shards,
+        "num_samples_requested": num_samples,
+        "drop_worst_fraction": drop_worst_fraction,
         "samples": rows,
+        **summarize_diagnostic_1(rows, drop_worst_fraction),
+    }
+
+
+def summarize_diagnostic_1(
+    rows: Sequence[Mapping[str, Any]], drop_worst_fraction: float = 0.1
+) -> dict[str, Any]:
+    """Return the spread of perplexity over sampled allocations, whole and trimmed.
+
+    The trimmed spread drops the worst allocations, because a floor tier that is
+    catastrophic turns the headline spread into a measure of cliff avoidance
+    rather than of allocation quality.
+    """
+    values = sorted(row["perplexity"] for row in rows)
+    if not values:
+        return {"full_spread": _spread([]), "trimmed_spread": _spread([]), "dropped_worst": 0}
+    keep = max(2, len(values) - max(1, int(round(drop_worst_fraction * len(values)))))
+    # Higher perplexity is worse, so the worst allocations sit at the end.
+    return {
         "full_spread": _spread(values),
-        "trimmed_spread": _spread(trimmed),
+        "trimmed_spread": _spread(values[:keep]),
         "dropped_worst": len(values) - keep,
+    }
+
+
+def merge_diagnostic_1(shards: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Combine Diagnostic 1 shard payloads into the result the whole experiment would give."""
+    if not shards:
+        raise ValueError("no shards to merge")
+    budgets = {s["budget_fraction"] for s in shards}
+    if len(budgets) > 1:
+        raise ValueError(f"shards disagree on the budget fraction: {sorted(budgets)}")
+    rows = sorted((row for s in shards for row in s["samples"]), key=lambda r: r["sample"])
+    drop = shards[0].get("drop_worst_fraction", 0.1)
+    return {
+        "budget_fraction": shards[0]["budget_fraction"],
+        "budget_bytes": shards[0]["budget_bytes"],
+        "slack_bytes": shards[0]["slack_bytes"],
+        "fidelity": shards[0]["fidelity"],
+        "subsample": shards[0]["subsample"],
+        "seed": shards[0]["seed"],
+        "merged_from_shards": sorted(s["shard"] for s in shards),
+        "num_samples_requested": shards[0]["num_samples_requested"],
+        "num_samples_measured": len(rows),
+        "complete": len(rows) == shards[0]["num_samples_requested"],
+        "samples": rows,
+        **summarize_diagnostic_1(rows, drop),
     }
 
 

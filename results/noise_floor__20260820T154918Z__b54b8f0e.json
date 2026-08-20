@@ -1,0 +1,219 @@
+{
+  "name": "noise_floor",
+  "git_commit": "b54b8f0eb56b65b1c7433bb76f7f40f301990256",
+  "seed": 0,
+  "started_at": "20260820T154918Z",
+  "wall_clock_seconds": 339.6313877089997,
+  "environment": {
+    "python": "3.12.14",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "torch": "2.13.0",
+    "transformers": "5.15.1",
+    "mps_available": true,
+    "cuda_available": false
+  },
+  "config": {
+    "model": {
+      "name": "allenai/OLMoE-1B-7B-0924",
+      "num_hidden_layers": 16,
+      "hidden_size": 2048,
+      "intermediate_size": 1024,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 16,
+      "num_experts": 64,
+      "num_experts_per_tok": 8,
+      "vocab_size": 50304,
+      "max_position_embeddings": 4096,
+      "tie_word_embeddings": false,
+      "attention_bias": false,
+      "has_qk_norm": true,
+      "dtype_bytes": 2
+    },
+    "kv": {
+      "context_length": 4096,
+      "batch_size": 4,
+      "dtype_bytes": 2,
+      "sink_tokens": 4
+    },
+    "quant": {
+      "group_size": 128,
+      "scale_bits": 16,
+      "zero_point_bits": 0,
+      "symmetric": true,
+      "unquantized_bits": 16
+    },
+    "ground_set": {
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1
+    },
+    "budgets": {
+      "fractions": [
+        0.25,
+        0.35,
+        0.5,
+        0.7
+      ]
+    },
+    "seed": 0,
+    "retention": {
+      "policy": "recency_sink",
+      "sink_tokens": 4
+    },
+    "protocol": {
+      "name": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "chunk_size": 256
+    },
+    "calibration": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 16,
+      "full_sequences": 256,
+      "seed": 0
+    },
+    "runtime": {
+      "device": "mps",
+      "dtype": "bfloat16",
+      "attn_implementation": null,
+      "master_store": "checkpoint"
+    },
+    "model_path": "/Users/helloimrizy/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+    "command": "noise-floor"
+  },
+  "payload": {
+    "paired": {
+      "num_subsamples": 4,
+      "reference_perplexity": {
+        "count": 4,
+        "min": 6.204377980053787,
+        "max": 8.128390958467259,
+        "range": 1.9240129784134723,
+        "mean": 7.038831285832627,
+        "stdev": 0.892587395826148
+      },
+      "probes": {
+        "d0.w.l08.b3": {
+          "deltas": [
+            0.12018438619587624,
+            0.04778359431108914,
+            0.0892634545555735,
+            0.058465771872452166
+          ],
+          "count": 4,
+          "min": 0.04778359431108914,
+          "max": 0.12018438619587624,
+          "range": 0.0724007918847871,
+          "mean": 0.07892430173374776,
+          "stdev": 0.032647550973818294
+        },
+        "d0.kv.l08.r0.25": {
+          "deltas": [
+            0.012392007135690442,
+            0.012819649725429372,
+            0.022070967304208544,
+            0.011957792843940496
+          ],
+          "count": 4,
+          "min": 0.011957792843940496,
+          "max": 0.022070967304208544,
+          "range": 0.010113174460268048,
+          "mean": 0.014810104252317213,
+          "stdev": 0.004853346457779541
+        }
+      }
+    },
+    "setup": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 16,
+      "full_sequences": 256,
+      "calibration_seed": 0,
+      "calibration_windows": 593,
+      "evaluation_windows": 70,
+      "policy": "recency_sink",
+      "sink_tokens": 4,
+      "protocol": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "protocol_chunk_size": 256,
+      "context_length": 4096,
+      "sink_tokens_declared": 4,
+      "retention_by_layer": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "8": 0.25,
+        "9": 1.0,
+        "10": 1.0,
+        "11": 1.0,
+        "12": 1.0,
+        "13": 1.0,
+        "14": 1.0,
+        "15": 1.0
+      },
+      "group_size": 128,
+      "symmetric": true,
+      "unquantized_bits": 16,
+      "num_expert_modules": 16,
+      "experts_per_bit_width": {
+        "16": 1024
+      },
+      "master_store": "checkpoint",
+      "snapshot_path": "/Users/helloimrizy/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+      "resident_bytes": 0,
+      "batch_size": 4,
+      "device": "mps",
+      "evaluation_count": 9
+    },
+    "ground_set": {
+      "signature": "2eb8f37ec9316e1f",
+      "model_name": "allenai/OLMoE-1B-7B-0924",
+      "num_units": 32,
+      "num_weight_units": 16,
+      "num_kv_units": 16,
+      "num_increments": 96,
+      "num_weight_increments": 48,
+      "num_kv_increments": 48,
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1,
+      "context_length": 4096,
+      "batch_size": 4,
+      "quant_group_size": 128,
+      "base_bytes": 4006875136,
+      "reference_bytes": 15985807360
+    },
+    "evaluation_count": 9
+  }
+}
