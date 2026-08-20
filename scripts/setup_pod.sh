@@ -7,8 +7,11 @@
 # for the device that produced it so a cache cannot be carried across.
 set -euo pipefail
 
-REPO_DIR="${1:-$HOME/submokv}"
+# Default to the repository this script lives in, so it works wherever the
+# machine puts the checkout.
+REPO_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
+echo "== repository: $REPO_DIR =="
 
 echo "== python environment =="
 command -v uv >/dev/null || pip install -q uv

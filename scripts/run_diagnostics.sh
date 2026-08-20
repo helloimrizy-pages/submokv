@@ -13,6 +13,7 @@ SEQUENCES="${SEQUENCES:-16}"
 BUDGET="${BUDGET:-0.35}"
 SAMPLES="${SAMPLES:-30}"
 STORE="${STORE:-memory}"
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH=.
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 

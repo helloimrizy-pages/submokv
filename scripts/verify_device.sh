@@ -5,6 +5,7 @@
 # was loaded with, F is bitwise deterministic, and perplexity is in the range a
 # working model gives. Any of them failing invalidates everything downstream.
 set -euo pipefail
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PYTHONPATH=.
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
