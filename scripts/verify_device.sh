@@ -10,13 +10,14 @@ export PYTHONPATH=.
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
 .venv/bin/python - <<'PY'
-import glob, time, torch
+import time, torch
 from pathlib import Path
-from submokv.cli import load_config
+from submokv.cli import load_config, resolve_model_path
 from submokv.utility import build_utility, CHEAP
 
-snap = glob.glob(str(Path.home() / ".cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/*"))[0]
 config = load_config(Path("configs/olmoe.yaml"))
+snap = resolve_model_path(config, None)
+print(f"snapshot {snap}")
 config["calibration"]["cheap_sequences"] = 8
 model, utility = build_utility(config, model_path=snap)
 print(f"device {utility.device}  cache {utility.cache_path.name}")

@@ -106,19 +106,35 @@ def _print_budgets(ground_set: GroundSet, fractions: Sequence[float]) -> None:
 
 
 def resolve_model_path(config: dict[str, Any], given: Path | None) -> str:
-    """Return a local snapshot path for the model, searching the cache when none is given."""
+    """Return a local snapshot path for the model, asking the hub where its cache is.
+
+    The cache is not always under the home directory. Rented machines commonly
+    point HF_HOME at whatever volume holds the disk, so the location is read
+    from huggingface_hub rather than assumed.
+    """
     if given is not None:
         return str(given)
     name = config["model"]["name"]
-    pattern = Path.home() / ".cache/huggingface/hub" / (
-        "models--" + name.replace("/", "--")
-    ) / "snapshots" / "*"
-    matches = sorted(glob.glob(str(pattern)))
-    if not matches:
-        raise FileNotFoundError(
-            f"no local snapshot of {name} found; pass --model-path or download it first"
+    try:
+        from huggingface_hub import snapshot_download
+
+        return snapshot_download(name, local_files_only=True)
+    except Exception as error:
+        from huggingface_hub import constants
+
+        pattern = (
+            Path(constants.HF_HUB_CACHE)
+            / ("models--" + name.replace("/", "--"))
+            / "snapshots"
+            / "*"
         )
-    return matches[-1]
+        matches = sorted(glob.glob(str(pattern)))
+        if not matches:
+            raise FileNotFoundError(
+                f"no local snapshot of {name} found under {constants.HF_HUB_CACHE}; "
+                f"pass --model-path or download it first ({type(error).__name__}: {error})"
+            ) from error
+        return matches[-1]
 
 
 def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
