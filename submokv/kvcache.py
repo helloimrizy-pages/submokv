@@ -261,6 +261,69 @@ def build_policy(config: Mapping[str, Any]) -> RetentionPolicy:
     return POLICIES[name](**settings)
 
 
+@dataclass(frozen=True)
+class EvaluationProtocol:
+    """What the retained set is measured relative to while a sequence is scored.
+
+    Masking says which positions a query may attend to. It does not by itself
+    say what the retained set is anchored to, and the readings disagree on
+    perplexity, so one is pinned here and recorded in every result.
+
+        global    One retained set fixed for the whole sequence. A query at
+                  position 2000 is denied position 1500 even though position
+                  1500 was recent and still cached when it was decoded. This
+                  measures something stricter than eviction.
+        sliding   Query t sees the sinks and the window before t, for every t
+                  including the first. This is StreamingLLM style sliding
+                  window attention. Honest, but a different deployment claim
+                  than prefilling and then evicting.
+        prefill_evict_decode
+                  Prefill a prefix with full attention, apply the policy to
+                  that prefix, then score teacher forced loss on the tail only,
+                  with each query attending to the retained prefix and its own
+                  chunk causally. The visible cache is held at the budget
+                  throughout the tail, so the peak matches what memory.py
+                  charges for the retention ratio. H2O and SnapKV report this
+                  way.
+
+    prefill_evict_decode is the one implemented, because it is the one the byte
+    accounting describes. Loss is never scored on prefill positions, where
+    nothing has been evicted yet, and that is the confound the other two
+    readings introduce.
+    """
+
+    name: str = "prefill_evict_decode"
+    prefill_tokens: int = 3072
+    chunk_size: int = 256
+
+    def __post_init__(self) -> None:
+        if self.name != "prefill_evict_decode":
+            raise ValueError(
+                f"only the prefill_evict_decode protocol is implemented, got {self.name!r}"
+            )
+        if self.prefill_tokens < 0:
+            raise ValueError(f"prefill_tokens must not be negative, got {self.prefill_tokens}")
+        if self.chunk_size <= 0:
+            raise ValueError(f"chunk_size must be positive, got {self.chunk_size}")
+
+    def describe(self) -> dict[str, Any]:
+        """Return the protocol name and its parameters for result records."""
+        return {
+            "protocol": self.name,
+            "prefill_tokens": self.prefill_tokens,
+            "protocol_chunk_size": self.chunk_size,
+        }
+
+    def scored_tokens(self, sequence_length: int) -> int:
+        """Return how many positions of a sequence carry loss."""
+        if self.prefill_tokens >= sequence_length:
+            raise ValueError(
+                f"prefill_tokens {self.prefill_tokens} leaves no tail to score in a "
+                f"sequence of length {sequence_length}"
+            )
+        return sequence_length - self.prefill_tokens
+
+
 class RetentionController:
     """Applies a per-layer retention ratio to a model by masking the attention.
 
@@ -273,11 +336,13 @@ class RetentionController:
         model: nn.Module,
         policy: RetentionPolicy,
         kv: KVSpec,
+        protocol: EvaluationProtocol | None = None,
         retention: Mapping[int, float] | None = None,
     ) -> None:
         self.model = model
         self.policy = policy
         self.kv = kv
+        self.protocol = protocol if protocol is not None else EvaluationProtocol()
         self.attention_modules = find_attention_modules(model)
         config = model.config
         self.num_attention_heads = int(config.num_attention_heads)
@@ -296,6 +361,7 @@ class RetentionController:
         self._state: dict[int, PolicyState] = {}
         self._sequence_length: int | None = None
         self._attention_weights: dict[int, torch.Tensor] = {}
+        self._masking_enabled = True
 
     @property
     def layers(self) -> tuple[int, ...]:
@@ -368,9 +434,23 @@ class RetentionController:
             for layer in self.layers
         }
 
-    def end_chunk(self) -> None:
-        """Let the policy evict after a chunk, using the attention weights that chunk produced."""
+    def set_masking(self, enabled: bool) -> None:
+        """Switch the retention mask on or off, leaving score accumulation running.
+
+        The prefill phase runs with full attention but still needs the attention
+        weights it produces, which is what the score based policy selects from.
+        """
+        self._masking_enabled = enabled
+
+    def end_chunk(self, reserve: int = 0, evict: bool = True) -> None:
+        """Take in a chunk's attention weights and let the policy evict.
+
+        reserve leaves room for the positions the next chunk will add, so the
+        visible cache never rises above the budget at the moment attention is
+        computed.
+        """
         if not isinstance(self.policy, AttentionScorePolicy):
+            self._attention_weights = {}
             return
         if self._sequence_length is None:
             raise RuntimeError("call begin_sequence before processing a chunk")
@@ -378,13 +458,16 @@ class RetentionController:
             state = self._state[layer]
             self.policy.accumulate(state, weights)
             state.positions_seen = weights.shape[-1]
-            self.policy.evict(state, self.budget_tokens(layer, self._sequence_length))
+            if evict:
+                budget = self.budget_tokens(layer, self._sequence_length) - reserve
+                self.policy.evict(state, max(budget, self.kv.sink_tokens))
         self._attention_weights = {}
 
     def describe(self) -> dict[str, Any]:
         """Return the policy and retention settings for result records."""
         return {
             **self.policy.describe(),
+            **self.protocol.describe(),
             "context_length": self.kv.context_length,
             "sink_tokens_declared": self.kv.sink_tokens,
             "retention_by_layer": {str(k): v for k, v in sorted(self._retention.items())},
@@ -393,7 +476,7 @@ class RetentionController:
     def _make_pre_hook(self, layer: int) -> Callable[..., Any]:
         def pre_hook(module: nn.Module, args: tuple, kwargs: dict) -> tuple[tuple, dict] | None:
             ratio = self._retention[layer]
-            if ratio >= 1.0:
+            if ratio >= 1.0 or not self._masking_enabled:
                 return None
             hidden_states = kwargs.get("hidden_states", args[0] if args else None)
             position_ids = kwargs.get("position_ids")
@@ -518,3 +601,95 @@ def forward_with_retention(
     if collect is not None:
         return None
     return torch.cat(pieces, dim=1)
+
+
+def score_sequence(
+    model: nn.Module,
+    input_ids: torch.Tensor,
+    controller: RetentionController,
+) -> torch.Tensor:
+    """Return the per-token negative log likelihood of the scored tail of each sequence.
+
+    The prefix named by the protocol is prefilled with full attention and
+    carries no loss, because nothing has been evicted there in a real run. The
+    tail is scored teacher forced, with each query attending to the retained
+    prefix and to its own chunk causally. A policy that evicts by attention
+    score re-evicts between chunks with room reserved for the positions the next
+    chunk adds, so the visible cache never rises above the budget at the moment
+    attention is computed.
+
+    Returns a float32 tensor of shape (batch, sequence_length - prefill_tokens).
+    """
+    if input_ids.ndim != 2:
+        raise ValueError(f"input_ids must have shape (batch, length), got {tuple(input_ids.shape)}")
+
+    from transformers.cache_utils import DynamicCache
+
+    protocol = controller.protocol
+    batch, total = input_ids.shape
+    prefill = protocol.prefill_tokens
+    protocol.scored_tokens(total)
+    device = input_ids.device
+    needs_scores = controller.policy.needs_attention_scores
+
+    controller.begin_sequence(batch, total, device)
+    cache = DynamicCache()
+    previous_logit: torch.Tensor | None = None
+
+    # Eager attention materializes a query by key matrix, so a prefix that needs
+    # attention weights is walked in chunks. A policy that reads no weights can
+    # take the prefix in one pass.
+    controller.set_masking(False)
+    prefill_step = protocol.chunk_size if needs_scores else max(prefill, 1)
+    first_tail = min(protocol.chunk_size, total - prefill)
+    start = 0
+    while start < prefill:
+        stop = min(start + prefill_step, prefill)
+        with torch.no_grad():
+            output = model(
+                input_ids=input_ids[:, start:stop],
+                past_key_values=cache,
+                use_cache=True,
+                cache_position=torch.arange(start, stop, device=device),
+                logits_to_keep=1,
+            )
+        # The prefix is evicted once, at the boundary, after every prefill chunk
+        # has contributed its attention mass.
+        controller.end_chunk(reserve=first_tail, evict=stop >= prefill)
+        previous_logit = output.logits[:, -1]
+        start = stop
+
+    controller.set_masking(True)
+    losses: list[torch.Tensor] = []
+    start = prefill
+    while start < total:
+        stop = min(start + protocol.chunk_size, total)
+        with torch.no_grad():
+            output = model(
+                input_ids=input_ids[:, start:stop],
+                past_key_values=cache,
+                use_cache=True,
+                cache_position=torch.arange(start, stop, device=device),
+            )
+        logits = output.logits
+        if previous_logit is None:
+            # Nothing was prefilled, so the first token of the sequence has no
+            # prediction to be scored against.
+            step_logits = logits[:, :-1]
+            targets = input_ids[:, start + 1 : stop]
+        else:
+            step_logits = torch.cat([previous_logit.unsqueeze(1), logits[:, :-1]], dim=1)
+            targets = input_ids[:, start:stop]
+        if targets.numel():
+            token_loss = torch.nn.functional.cross_entropy(
+                step_logits.reshape(-1, step_logits.shape[-1]).float(),
+                targets.reshape(-1),
+                reduction="none",
+            )
+            losses.append(token_loss.reshape(batch, -1))
+        previous_logit = logits[:, -1]
+        next_start = stop
+        controller.end_chunk(reserve=min(protocol.chunk_size, max(total - next_start, 0)))
+        start = stop
+
+    return torch.cat(losses, dim=1)

@@ -17,9 +17,12 @@ of the matrix, so the group count matches the accounting in memory.py.
 
 from __future__ import annotations
 
+import json
 import re
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
 
 import torch
 from torch import nn
@@ -115,12 +118,147 @@ def find_expert_modules(model: nn.Module) -> tuple[ExpertModule, ...]:
     return tuple(found)
 
 
+class MasterStore(ABC):
+    """Supplies the unmodified expert weights that a tier is quantized from.
+
+    Quantization cannot be undone, so every tier change reads the original
+    weights again. Where those originals live is the caller's choice.
+    """
+
+    @abstractmethod
+    def read(
+        self,
+        layer: int,
+        name: str,
+        experts: Sequence[int],
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        """Return the unmodified weights of the named experts, stacked on the first dimension."""
+
+    @abstractmethod
+    def resident_bytes(self) -> int:
+        """Return how many bytes this store holds in memory."""
+
+    @abstractmethod
+    def describe(self) -> dict[str, Any]:
+        """Return the store settings for result records."""
+
+
+class MemoryMasterStore(MasterStore):
+    """Holds a copy of every expert parameter in memory.
+
+    This costs as many bytes as the expert weights themselves, which for
+    OLMoE-1B-7B is 12 GiB on top of the resident model.
+    """
+
+    def __init__(self, expert_modules: Sequence["ExpertModule"], device: str | torch.device = "cpu") -> None:
+        self.device = torch.device(device)
+        self._tensors: dict[tuple[int, str], torch.Tensor] = {}
+        for entry in expert_modules:
+            for name in EXPERT_PARAMETER_NAMES:
+                parameter = getattr(entry.module, name)
+                self._tensors[(entry.layer, name)] = parameter.detach().to(self.device, copy=True)
+
+    def read(
+        self,
+        layer: int,
+        name: str,
+        experts: Sequence[int],
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        """Return the unmodified weights of the named experts, stacked on the first dimension."""
+        return self._tensors[(layer, name)][list(experts)].to(device, dtype=dtype)
+
+    def resident_bytes(self) -> int:
+        """Return how many bytes this store holds in memory."""
+        return sum(t.numel() * t.element_size() for t in self._tensors.values())
+
+    def describe(self) -> dict[str, Any]:
+        """Return the store settings for result records."""
+        return {"master_store": "memory", "device": str(self.device), "resident_bytes": self.resident_bytes()}
+
+
+class CheckpointMasterStore(MasterStore):
+    """Reads unmodified expert weights from the safetensors checkpoint on demand.
+
+    Nothing is held in memory, which matters because the memory store and the
+    resident model together do not leave room for a batched KV cache on a 36 GB
+    machine. The checkpoint stores one matrix per expert while transformers
+    packs them, so gate_proj and up_proj are concatenated on read in the order
+    the packed forward pass chunks them apart.
+    """
+
+    def __init__(
+        self,
+        snapshot_path: str | Path,
+        module_template: str = "model.layers.{layer}.mlp.experts.{expert}",
+        index_name: str = "model.safetensors.index.json",
+    ) -> None:
+        self.snapshot_path = Path(snapshot_path)
+        self.module_template = module_template
+        index_path = self.snapshot_path / index_name
+        if not index_path.exists():
+            raise FileNotFoundError(f"no checkpoint index at {index_path}")
+        self.weight_map: dict[str, str] = json.loads(index_path.read_text())["weight_map"]
+        self._handles: dict[str, Any] = {}
+
+    def _tensor(self, key: str) -> torch.Tensor:
+        from safetensors import safe_open
+
+        shard = self.weight_map.get(key)
+        if shard is None:
+            raise KeyError(f"checkpoint holds no tensor named {key!r}")
+        handle = self._handles.get(shard)
+        if handle is None:
+            handle = safe_open(str(self.snapshot_path / shard), framework="pt")
+            self._handles[shard] = handle
+        return handle.get_tensor(key)
+
+    def read(
+        self,
+        layer: int,
+        name: str,
+        experts: Sequence[int],
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        """Return the unmodified weights of the named experts, stacked on the first dimension."""
+        slices: list[torch.Tensor] = []
+        for expert in experts:
+            prefix = self.module_template.format(layer=layer, expert=expert)
+            if name == "gate_up_proj":
+                gate = self._tensor(f"{prefix}.gate_proj.weight")
+                up = self._tensor(f"{prefix}.up_proj.weight")
+                slices.append(torch.cat([gate, up], dim=0))
+            elif name == "down_proj":
+                slices.append(self._tensor(f"{prefix}.down_proj.weight"))
+            else:
+                raise KeyError(f"no checkpoint rule for parameter {name!r}")
+        return torch.stack(slices, dim=0).to(device, dtype=dtype)
+
+    def resident_bytes(self) -> int:
+        """Return how many bytes this store holds in memory."""
+        return 0
+
+    def describe(self) -> dict[str, Any]:
+        """Return the store settings for result records."""
+        return {
+            "master_store": "checkpoint",
+            "snapshot_path": str(self.snapshot_path),
+            "resident_bytes": 0,
+        }
+
+
 class ExpertQuantizer:
     """Applies a per expert bit width plan to a model's expert weights.
 
-    The unmodified weights are kept in a master store so that any expert can be
-    moved to any tier at runtime without reloading the model. Only experts whose
-    bit width changes are rewritten, so moving one unit up its ladder touches one
+    Quantized values are written into the packed expert parameters in place, so
+    shapes and dtypes never change and the model runs unmodified. The
+    unmodified weights come from a master store, which lets any expert move to
+    any tier at runtime without reloading the model. Only experts whose bit
+    width changes are rewritten, so moving one unit up its ladder touches one
     layer.
     """
 
@@ -128,6 +266,7 @@ class ExpertQuantizer:
         self,
         model: nn.Module,
         quant: QuantSpec,
+        master: MasterStore | None = None,
         master_device: str | torch.device = "cpu",
     ) -> None:
         if not quant.symmetric:
@@ -137,44 +276,52 @@ class ExpertQuantizer:
             )
         self.model = model
         self.quant = quant
-        self.master_device = torch.device(master_device)
         self.expert_modules = find_expert_modules(model)
-        self._master: dict[tuple[int, str], torch.Tensor] = {}
-        self._active_bits: dict[int, dict[int, int]] = {}
-        self._attached = False
+        self.master = master if master is not None else MemoryMasterStore(self.expert_modules, master_device)
+        self._active_bits: dict[int, dict[int, int]] = {
+            entry.layer: {
+                expert: self.quant.unquantized_bits for expert in range(entry.num_experts)
+            }
+            for entry in self.expert_modules
+        }
+
+    @classmethod
+    def from_checkpoint(
+        cls,
+        model: nn.Module,
+        quant: QuantSpec,
+        snapshot_path: str | Path,
+    ) -> "ExpertQuantizer":
+        """Build a quantizer whose master weights are read from the checkpoint on demand."""
+        return cls(model, quant, master=CheckpointMasterStore(snapshot_path))
 
     @property
     def layers(self) -> tuple[int, ...]:
         """Return the layer indices that hold experts."""
         return tuple(entry.layer for entry in self.expert_modules)
 
-    def attach(self) -> "ExpertQuantizer":
-        """Copy the unmodified expert weights into the master store.
+    def verify_master(self, layer: int = 0, experts: Sequence[int] = (0, 1)) -> None:
+        """Check that the master store reproduces the weights the model was loaded with.
 
-        The store holds one copy of every expert parameter, so it costs as many
-        bytes as the expert weights themselves.
+        A checkpoint that stores one matrix per expert has to be repacked, and a
+        wrong concatenation order would quantize the right bytes into the wrong
+        places while every shape still matched. This is called before the first
+        tier change so that failure is loud.
         """
-        if self._attached:
-            return self
-        for entry in self.expert_modules:
-            for name in EXPERT_PARAMETER_NAMES:
-                parameter = getattr(entry.module, name)
-                self._master[(entry.layer, name)] = parameter.detach().to(
-                    self.master_device, copy=True
+        entry = {item.layer: item for item in self.expert_modules}[layer]
+        for name in EXPERT_PARAMETER_NAMES:
+            parameter = getattr(entry.module, name)
+            expected = parameter.data[list(experts)]
+            actual = self.master.read(layer, name, experts, parameter.device, parameter.dtype)
+            if not torch.equal(actual, expected):
+                difference = (actual.float() - expected.float()).abs().max().item()
+                raise ValueError(
+                    f"master store does not reproduce {name} of layer {layer} experts "
+                    f"{list(experts)}; largest difference {difference}"
                 )
-            self._active_bits[entry.layer] = {
-                expert: self.quant.unquantized_bits for expert in range(entry.num_experts)
-            }
-        self._attached = True
-        return self
-
-    def master_bytes(self) -> int:
-        """Return the bytes held by the master store."""
-        return sum(tensor.numel() * tensor.element_size() for tensor in self._master.values())
 
     def current_plan(self) -> dict[int, dict[int, int]]:
         """Return the bit width currently applied to every expert."""
-        self._require_attached()
         return {layer: dict(bits) for layer, bits in self._active_bits.items()}
 
     def set_plan(self, plan: WeightPlan) -> int:
@@ -183,7 +330,6 @@ class ExpertQuantizer:
         Experts already at the requested bit width are left untouched, so
         repeated calls that move one unit up its ladder rewrite one layer.
         """
-        self._require_attached()
         modules = {entry.layer: entry for entry in self.expert_modules}
         unknown = set(plan) - set(modules)
         if unknown:
@@ -206,10 +352,11 @@ class ExpertQuantizer:
                 grouped.setdefault(bits, []).append(expert)
             for name in EXPERT_PARAMETER_NAMES:
                 parameter = getattr(entry.module, name)
-                master = self._master[(entry.layer, name)]
                 for bits, experts in grouped.items():
                     experts = sorted(experts)
-                    source = master[experts].to(parameter.device, dtype=parameter.dtype)
+                    source = self.master.read(
+                        entry.layer, name, experts, parameter.device, parameter.dtype
+                    )
                     with torch.no_grad():
                         parameter.data[experts] = fake_quantize(
                             source, bits, self.quant.group_size, self.quant.unquantized_bits
@@ -221,7 +368,6 @@ class ExpertQuantizer:
 
     def set_uniform_bits(self, bits: int, layers: Iterable[int] | None = None) -> int:
         """Apply one bit width to every expert, or to the experts of the named layers."""
-        self._require_attached()
         selected = set(self.layers) if layers is None else set(layers)
         modules = {entry.layer: entry for entry in self.expert_modules}
         plan = {
@@ -234,9 +380,8 @@ class ExpertQuantizer:
         """Return every expert to its unmodified weights."""
         return self.set_uniform_bits(self.quant.unquantized_bits)
 
-    def describe(self) -> dict[str, object]:
+    def describe(self) -> dict[str, Any]:
         """Return the quantizer settings for result records."""
-        self._require_attached()
         counts: dict[int, int] = {}
         for expert_bits in self._active_bits.values():
             for bits in expert_bits.values():
@@ -247,9 +392,5 @@ class ExpertQuantizer:
             "unquantized_bits": self.quant.unquantized_bits,
             "num_expert_modules": len(self.expert_modules),
             "experts_per_bit_width": {str(k): v for k, v in sorted(counts.items())},
-            "master_bytes": self.master_bytes(),
+            **self.master.describe(),
         }
-
-    def _require_attached(self) -> None:
-        if not self._attached:
-            raise RuntimeError("call attach() before using the quantizer")

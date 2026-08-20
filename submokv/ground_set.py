@@ -27,7 +27,11 @@ from .memory import (
     reference_footprint,
 )
 
-DEFAULT_WEIGHT_TIERS: tuple[int, ...] = (2, 3, 4, 8, 16)
+# The floor is 3 bits, not 2. A symmetric grid of 2 ** (bits - 1) - 1 levels is
+# ternary at 2 bits, so one of the four codes is unused and the tier delivers
+# less than memory.py charges for it. 2 bits stays available as a diagnostic
+# probe but is not part of the search space.
+DEFAULT_WEIGHT_TIERS: tuple[int, ...] = (3, 4, 8, 16)
 DEFAULT_KV_TIERS: tuple[float, ...] = (0.25, 0.50, 0.75, 1.00)
 
 

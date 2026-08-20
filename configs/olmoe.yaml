@@ -26,7 +26,9 @@ kv:
   # max_position_embeddings 4096, so 4096 is the largest value that needs no
   # position interpolation.
   context_length: 4096
-  batch_size: 1
+  # Batch is the KV lever at native context. At batch 1 the KV ladder is a few
+  # percent of the buyable budget, too small for an interaction term to show.
+  batch_size: 4
   dtype_bytes: 2
   sink_tokens: 4
 
@@ -39,7 +41,7 @@ quant:
   unquantized_bits: 16
 
 ground_set:
-  weight_tiers: [2, 3, 4, 8, 16]
+  weight_tiers: [3, 4, 8, 16]
   kv_tiers: [0.25, 0.50, 0.75, 1.00]
   # 1 puts every expert in a layer on a single ladder. Raising this splits a
   # layer's experts into that many contiguous groups, each with its own ladder.
@@ -48,7 +50,7 @@ ground_set:
 budgets:
   # Fractions of the reference footprint, which is every expert at 16 bits and
   # every layer's cache retained in full.
-  fractions: [0.15, 0.20, 0.25, 0.35]
+  fractions: [0.25, 0.35, 0.50, 0.70]
 
 seed: 0
 
@@ -61,13 +63,33 @@ retention:
   # policy: attention_score
   # recent_window: 32
 
+protocol:
+  # What the retained set is anchored to. Prefill a prefix with full attention,
+  # apply the policy to it, then score the tail only, holding the visible cache
+  # at the budget. This is the reading memory.py charges for.
+  name: prefill_evict_decode
+  prefill_tokens: 3072
+  chunk_size: 256
+
+calibration:
+  dataset: Salesforce/wikitext
+  subset: wikitext-2-raw-v1
+  # F reads the calibration split. Results are reported on the evaluation
+  # split. The two are checked to share no window.
+  calibration_split: train
+  evaluation_split: test
+  sequence_length: 4096
+  cheap_sequences: 64
+  full_sequences: 256
+  seed: 0
+
 runtime:
   device: mps
-  dtype: float16
-  # attention_score needs eager, which is the only implementation that returns
-  # attention weights. recency_sink runs under sdpa.
-  attn_implementation: sdpa
-  # Only used by a policy that evicts between chunks.
-  chunk_size: 512
-  # Where the unmodified expert weights are held so any tier can be reapplied.
-  master_device: cpu
+  # The checkpoint is bfloat16, so loading in bfloat16 converts nothing.
+  dtype: bfloat16
+  # attention_score needs eager, the only implementation that returns attention
+  # weights. recency_sink runs under sdpa. Left null to follow the policy.
+  attn_implementation: null
+  # The memory master would cost 12 GiB on top of the resident model, which
+  # does not leave room for a batched cache on this machine.
+  master_store: checkpoint

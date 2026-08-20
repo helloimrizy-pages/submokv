@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 from pathlib import Path
 from typing import Any, Sequence
@@ -11,6 +12,7 @@ import yaml
 
 from .ground_set import BudgetInfeasibleError, GroundSet, UnitKind
 from .memory import format_bytes, reference_footprint, total_params
+from .records import record
 
 DEFAULT_CONFIG = Path("configs/olmoe.yaml")
 
@@ -103,6 +105,61 @@ def _print_budgets(ground_set: GroundSet, fractions: Sequence[float]) -> None:
         )
 
 
+def resolve_model_path(config: dict[str, Any], given: Path | None) -> str:
+    """Return a local snapshot path for the model, searching the cache when none is given."""
+    if given is not None:
+        return str(given)
+    name = config["model"]["name"]
+    pattern = Path.home() / ".cache/huggingface/hub" / (
+        "models--" + name.replace("/", "--")
+    ) / "snapshots" / "*"
+    matches = sorted(glob.glob(str(pattern)))
+    if not matches:
+        raise FileNotFoundError(
+            f"no local snapshot of {name} found; pass --model-path or download it first"
+        )
+    return matches[-1]
+
+
+def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
+    """Load the model, run the requested diagnostic, and write a result record."""
+    from .diagnostics import (
+        diagnostic_0_sensitivity,
+        diagnostic_1_headroom,
+        diagnostic_2_interaction,
+        noise_floor_sweep,
+    )
+    from .utility import build_utility
+
+    model_path = resolve_model_path(config, args.model_path)
+    seed = int(config.get("seed", 0))
+    _, utility = build_utility(config, model_path=model_path, device=args.device)
+
+    full_config = {**config, "model_path": model_path, "command": args.command}
+    with record(args.command.replace("-", "_"), full_config, seed) as entry:
+        if args.command == "noise-floor":
+            sizes = [int(part) for part in args.sizes.split(",")]
+            entry.payload["sweep"] = noise_floor_sweep(utility, sizes, args.subsamples)
+            entry.payload["determinism"] = utility.verify_determinism(
+                utility.ground_set.full_allocation()
+            )
+        elif args.command == "diagnostic-0":
+            entry.payload["diagnostic_0"] = diagnostic_0_sensitivity(
+                utility,
+                per_expert_layers=[int(p) for p in args.expert_layers.split(",")],
+                per_expert_sample=args.expert_sample,
+            )
+        elif args.command == "diagnostic-1":
+            entry.payload["diagnostic_1"] = diagnostic_1_headroom(
+                utility, args.budget, args.samples, seed
+            )
+        elif args.command == "diagnostic-2":
+            entry.payload["diagnostic_2"] = diagnostic_2_interaction(utility, args.budget)
+        entry.payload["setup"] = utility.describe()
+        entry.payload["ground_set"] = utility.ground_set.describe()
+        entry.payload["evaluation_count"] = utility.evaluation_count
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse arguments and run the requested command."""
     parser = argparse.ArgumentParser(prog="submokv", description=__doc__)
@@ -112,6 +169,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     subparsers.add_parser("budget", help="print the footprint breakdown and budget feasibility")
     describe = subparsers.add_parser("describe", help="print the ground set summary as JSON")
     describe.add_argument("--indent", type=int, default=2)
+
+    for name, help_text in (
+        ("noise-floor", "measure how far perplexity moves with the calibration draw"),
+        ("diagnostic-0", "sensitivity spread, per layer and per expert"),
+        ("diagnostic-1", "achievable headroom across random feasible allocations"),
+        ("diagnostic-2", "interaction between the weight and KV axes"),
+    ):
+        sub = subparsers.add_parser(name, help=help_text)
+        sub.add_argument("--model-path", type=Path, default=None)
+        sub.add_argument("--device", type=str, default=None)
+        if name == "noise-floor":
+            sub.add_argument("--sizes", type=str, default="16,32,64")
+            sub.add_argument("--subsamples", type=int, default=6)
+        if name == "diagnostic-0":
+            sub.add_argument("--expert-layers", type=str, default="0,8")
+            sub.add_argument("--expert-sample", type=int, default=8)
+        if name in ("diagnostic-1", "diagnostic-2"):
+            sub.add_argument("--budget", type=float, default=0.35)
+        if name == "diagnostic-1":
+            sub.add_argument("--samples", type=int, default=30)
 
     args = parser.parse_args(argv)
     config = load_config(args.config)
@@ -123,6 +200,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_budgets(ground_set, config.get("budgets", {}).get("fractions", []))
     elif args.command == "describe":
         print(json.dumps(ground_set.describe(), indent=args.indent))
+    else:
+        _run_diagnostic(args, config)
     return 0
 
 

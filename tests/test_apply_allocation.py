@@ -45,7 +45,7 @@ def test_the_top_allocation_reproduces_the_unmodified_model_exactly(
     with torch.no_grad():
         before = tiny_model(input_ids=tiny_ids).logits
 
-    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT).attach()
+    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT)
     controller = RetentionController(
         tiny_model, RecencySinkPolicy(sink_tokens=2), TINY_KV
     ).attach()
@@ -57,20 +57,20 @@ def test_the_top_allocation_reproduces_the_unmodified_model_exactly(
 
 def test_the_base_allocation_sets_the_lowest_tier_everywhere(tiny_model, tiny_ids) -> None:
     ground_set = tiny_ground_set()
-    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT).attach()
+    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT)
     controller = RetentionController(
         tiny_model, RecencySinkPolicy(sink_tokens=2), TINY_KV
     ).attach()
     apply(ground_set, ground_set.base_allocation(), quantizer, controller)
 
-    assert {bits for layer in quantizer.current_plan().values() for bits in layer.values()} == {2}
+    assert {bits for layer in quantizer.current_plan().values() for bits in layer.values()} == {3}
     assert set(controller.retention().values()) == {0.25}
 
 
 def test_one_increment_moves_exactly_one_unit(tiny_model, tiny_ids) -> None:
     """A greedy step touches one ladder, so one layer is rewritten and the rest are untouched."""
     ground_set = tiny_ground_set()
-    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT).attach()
+    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT)
     controller = RetentionController(
         tiny_model, RecencySinkPolicy(sink_tokens=2), TINY_KV
     ).attach()
@@ -81,8 +81,8 @@ def test_one_increment_moves_exactly_one_unit(tiny_model, tiny_ids) -> None:
     allocation = ground_set.apply(allocation, ground_set.increment("w.l01:1"))
     changed = quantizer.set_plan(ground_set.weight_bits_by_expert(allocation))
     assert changed == TINY_ARCHITECTURE["num_experts"]
-    assert set(quantizer.current_plan()[1].values()) == {3}
-    assert set(quantizer.current_plan()[0].values()) == {2}
+    assert set(quantizer.current_plan()[1].values()) == {4}
+    assert set(quantizer.current_plan()[0].values()) == {3}
 
     allocation = ground_set.apply(allocation, ground_set.increment("kv.l02:1"))
     controller.set_retention(ground_set.kv_retention_by_layer(allocation))
@@ -91,7 +91,7 @@ def test_one_increment_moves_exactly_one_unit(tiny_model, tiny_ids) -> None:
 
 def test_a_heterogeneous_allocation_reaches_the_hooks(tiny_model, tiny_ids) -> None:
     ground_set = tiny_ground_set()
-    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT).attach()
+    quantizer = ExpertQuantizer(tiny_model, TINY_QUANT)
     controller = RetentionController(
         tiny_model, RecencySinkPolicy(sink_tokens=2), TINY_KV
     ).attach()
@@ -100,8 +100,8 @@ def test_a_heterogeneous_allocation_reaches_the_hooks(tiny_model, tiny_ids) -> N
     )
     apply(ground_set, allocation, quantizer, controller)
 
-    assert set(quantizer.current_plan()[0].values()) == {8}
-    assert set(quantizer.current_plan()[1].values()) == {2}
+    assert set(quantizer.current_plan()[0].values()) == {16}
+    assert set(quantizer.current_plan()[1].values()) == {3}
     assert controller.retention() == {0: 0.25, 1: 0.25, 2: 0.75}
     logits = forward_with_retention(tiny_model, tiny_ids, controller)
     assert logits.shape == (1, 16, TINY_ARCHITECTURE["vocab_size"])

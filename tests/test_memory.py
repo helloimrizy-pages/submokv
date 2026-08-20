@@ -35,6 +35,9 @@ EXPERTS = 64
 VOCAB = 50304
 CONTEXT = 4096
 DTYPE_BYTES = 2
+# Batch is the KV lever at native context, so the declared batch is part of the
+# footprint the budget fractions are taken against.
+BATCH = 4
 
 # Each expert holds gate_proj and up_proj of shape (1024, 2048) and down_proj of
 # shape (2048, 1024).
@@ -58,7 +61,7 @@ HAND_TOTAL_PARAMS = (
     + HAND_EMBEDDING_PARAMS
 )
 HAND_WEIGHT_BYTES_16BIT = HAND_TOTAL_PARAMS * DTYPE_BYTES
-HAND_KV_BYTES_FULL = LAYERS * 2 * CONTEXT * KV_HEADS * HEAD_DIM * DTYPE_BYTES
+HAND_KV_BYTES_FULL = BATCH * LAYERS * 2 * CONTEXT * KV_HEADS * HEAD_DIM * DTYPE_BYTES
 HAND_REFERENCE_BYTES = HAND_WEIGHT_BYTES_16BIT + HAND_KV_BYTES_FULL
 
 TOLERANCE = 1e-3
@@ -173,7 +176,7 @@ def test_retained_tokens_rejects_ratio_outside_unit_interval(kv_spec: KVSpec) ->
 def test_kv_bytes_per_layer_matches_hand_computation(
     olmoe_model: ModelSpec, kv_spec: KVSpec
 ) -> None:
-    expected = 2 * CONTEXT * KV_HEADS * HEAD_DIM * DTYPE_BYTES
+    expected = BATCH * 2 * CONTEXT * KV_HEADS * HEAD_DIM * DTYPE_BYTES
     assert kv_bytes_per_layer(olmoe_model, kv_spec, 1.0) == expected
     assert kv_bytes_per_layer(olmoe_model, kv_spec, 0.25) == expected // 4
 

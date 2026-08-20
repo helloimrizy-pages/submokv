@@ -7,11 +7,13 @@ import torch
 
 from submokv.kvcache import (
     AttentionScorePolicy,
+    EvaluationProtocol,
     RecencySinkPolicy,
     RetentionController,
     build_policy,
     find_attention_modules,
     forward_with_retention,
+    score_sequence,
 )
 from submokv.memory import KVSpec
 
@@ -276,3 +278,98 @@ def test_shipped_config_pins_one_policy() -> None:
     policy = build_policy(config["retention"])
     assert policy.name == "recency_sink"
     assert policy.sink_tokens == config["kv"]["sink_tokens"]
+
+
+def _plain_tail_nll(model, ids, prefill: int) -> torch.Tensor:
+    """Return the per-token tail loss of an unmodified full attention pass."""
+    with torch.no_grad():
+        logits = model(input_ids=ids, use_cache=False).logits
+    step_logits = logits[:, prefill - 1 : -1]
+    targets = ids[:, prefill:]
+    loss = torch.nn.functional.cross_entropy(
+        step_logits.reshape(-1, step_logits.shape[-1]).float(),
+        targets.reshape(-1),
+        reduction="none",
+    )
+    return loss.reshape(ids.shape[0], -1)
+
+
+def test_the_protocol_scores_the_tail_only(tiny_model, tiny_ids, tiny_kv) -> None:
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    losses = score_sequence(tiny_model, tiny_ids, controller)
+    assert losses.shape == (1, 8)
+    assert protocol.scored_tokens(16) == 8
+
+
+def test_full_retention_under_the_protocol_matches_a_plain_pass(
+    tiny_model, tiny_ids, tiny_kv
+) -> None:
+    """With nothing evicted, the two phase route must agree with one full attention pass."""
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    losses = score_sequence(tiny_model, tiny_ids, controller)
+    assert torch.allclose(losses, _plain_tail_nll(tiny_model, tiny_ids, 8), atol=CHUNK_TOLERANCE)
+
+
+def test_lower_retention_raises_the_tail_loss(tiny_model, tiny_ids, tiny_kv) -> None:
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    full = score_sequence(tiny_model, tiny_ids, controller).mean().item()
+    controller.set_uniform_retention(0.25)
+    reduced = score_sequence(tiny_model, tiny_ids, controller).mean().item()
+    assert reduced != full
+
+
+def test_the_visible_cache_never_exceeds_the_budget(tiny_model_eager, tiny_ids, tiny_kv) -> None:
+    """The peak visible cache is what memory.py charges for, so it is checked directly."""
+    seen: list[int] = []
+
+    def record(module, args, kwargs, output):
+        weights = output[1]
+        if weights is not None:
+            seen.append(int((weights[0, 0] > 1e-12).sum(-1).max().item()))
+
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model_eager, AttentionScorePolicy(sink_tokens=2, recent_window=2), tiny_kv, protocol
+    ).attach()
+    controller.set_uniform_retention(0.5)
+    handle = tiny_model_eager.model.layers[0].self_attn.register_forward_hook(
+        record, with_kwargs=True
+    )
+    score_sequence(tiny_model_eager, tiny_ids, controller)
+    handle.remove()
+
+    budget = controller.budget_tokens(0, 16)
+    tail_peaks = seen[protocol.prefill_tokens // protocol.chunk_size :]
+    assert max(tail_peaks) <= budget
+
+
+def test_describe_records_the_protocol_next_to_the_policy(tiny_model, tiny_kv) -> None:
+    controller = RetentionController(
+        tiny_model,
+        RecencySinkPolicy(sink_tokens=2),
+        tiny_kv,
+        EvaluationProtocol(prefill_tokens=3072, chunk_size=256),
+    )
+    summary = controller.describe()
+    assert summary["policy"] == "recency_sink"
+    assert summary["protocol"] == "prefill_evict_decode"
+    assert summary["prefill_tokens"] == 3072
+
+
+def test_an_unimplemented_protocol_is_refused() -> None:
+    with pytest.raises(ValueError, match="only the prefill_evict_decode protocol"):
+        EvaluationProtocol(name="sliding")
+
+
+def test_a_prefix_that_swallows_the_sequence_is_refused() -> None:
+    with pytest.raises(ValueError, match="leaves no tail"):
+        EvaluationProtocol(prefill_tokens=16).scored_tokens(16)

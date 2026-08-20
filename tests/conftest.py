@@ -36,7 +36,7 @@ def olmoe_model() -> ModelSpec:
 @pytest.fixture
 def kv_spec() -> KVSpec:
     """Return the declared KV cache shape used across the tests."""
-    return KVSpec(context_length=4096, batch_size=1, dtype_bytes=2, sink_tokens=4)
+    return KVSpec(context_length=4096, batch_size=4, dtype_bytes=2, sink_tokens=4)
 
 
 @pytest.fixture

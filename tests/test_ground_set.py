@@ -14,28 +14,28 @@ from submokv.ground_set import (
 from submokv.memory import KVSpec, ModelSpec, QuantSpec
 
 LAYERS = 16
-WEIGHT_TIERS = (2, 3, 4, 8, 16)
+WEIGHT_TIERS = (3, 4, 8, 16)
 KV_TIERS = (0.25, 0.50, 0.75, 1.00)
 
-# Base state, recomputed by hand. A 2-bit weight with one 16-bit scale per group
-# of 128 costs 2.125 bits per element.
+# Base state, recomputed by hand. A 3-bit weight with one 16-bit scale per group
+# of 128 costs 3.125 bits per element, which is 25/64 of a byte.
 HAND_EXPERT_PARAMS_PER_LAYER = 64 * 3 * 1024 * 2048
-HAND_BASE_EXPERT_BYTES = LAYERS * HAND_EXPERT_PARAMS_PER_LAYER * 17 // 64
+HAND_BASE_EXPERT_BYTES = LAYERS * HAND_EXPERT_PARAMS_PER_LAYER * 25 // 64
 HAND_FIXED_PARAMS = LAYERS * (4 * 2048 * 2048 + 2048 * 64 + 4 * 2048) + 2 * 50304 * 2048 + 2048
 HAND_FIXED_BYTES = HAND_FIXED_PARAMS * 2
-HAND_BASE_KV_BYTES = LAYERS * 2 * 1024 * 16 * 128 * 2
+HAND_BASE_KV_BYTES = 4 * LAYERS * 2 * 1024 * 16 * 128 * 2
 HAND_BASE_BYTES = HAND_BASE_EXPERT_BYTES + HAND_FIXED_BYTES + HAND_BASE_KV_BYTES
 
 
 def test_unit_and_increment_counts(ground_set: GroundSet) -> None:
-    """OLMoE-1B-7B has 16 layers, so the ground set holds 32 units and 112 increments."""
+    """OLMoE-1B-7B has 16 layers, so the ground set holds 32 units and 96 increments."""
     assert len(ground_set.units) == 2 * LAYERS
     weight_units = [u for u in ground_set.units if u.kind is UnitKind.WEIGHT]
     kv_units = [u for u in ground_set.units if u.kind is UnitKind.KV]
     assert len(weight_units) == LAYERS
     assert len(kv_units) == LAYERS
     assert len(ground_set.increments) == LAYERS * (len(WEIGHT_TIERS) - 1 + len(KV_TIERS) - 1)
-    assert len(ground_set.increments) == 112
+    assert len(ground_set.increments) == 96
 
 
 def test_every_weight_unit_covers_all_experts_of_its_layer(ground_set: GroundSet) -> None:
@@ -184,8 +184,8 @@ def test_allocation_from_another_ground_set_is_rejected(
 def test_tier_plans_drive_the_hooks(ground_set: GroundSet) -> None:
     allocation = ground_set.allocation_from_selection(["w.l00:1", "w.l00:2", "kv.l03:1"])
     weight_plan = ground_set.weight_bits_by_expert(allocation)
-    assert weight_plan[0][0] == 4
-    assert weight_plan[1][0] == 2
+    assert weight_plan[0][0] == 8
+    assert weight_plan[1][0] == 3
     retention = ground_set.kv_retention_by_layer(allocation)
     assert retention[3] == 0.50
     assert retention[0] == 0.25
@@ -216,13 +216,24 @@ def test_plan_budget_fails_loudly_when_the_base_state_exceeds_the_budget(
     ground_set: GroundSet,
 ) -> None:
     with pytest.raises(BudgetInfeasibleError, match="No allocation is feasible"):
-        ground_set.plan_budget(0.15)
+        ground_set.plan_budget(0.20)
+
+
+def test_the_lowest_requested_budget_is_infeasible_by_a_small_margin(
+    ground_set: GroundSet,
+) -> None:
+    """The 3-bit floor puts the base at 0.2507, just above the 0.25 budget."""
+    reference = ground_set.reference_bytes()
+    shortfall = ground_set.base_cost_bytes() - int(0.25 * reference)
+    assert 0 < shortfall < 0.001 * reference
+    with pytest.raises(BudgetInfeasibleError):
+        ground_set.plan_budget(0.25)
 
 
 def test_base_state_fraction_bounds_the_usable_budget_range(ground_set: GroundSet) -> None:
     """The unquantized parameters put a hard floor under every budget."""
     base_fraction = ground_set.base_cost_bytes() / ground_set.reference_bytes()
-    assert 0.19 < base_fraction < 0.20
+    assert 0.250 < base_fraction < 0.251
 
 
 def test_ground_set_from_config_matches_direct_construction(ground_set: GroundSet) -> None:
@@ -240,9 +251,9 @@ def test_ground_set_from_config_matches_direct_construction(ground_set: GroundSe
             "tie_word_embeddings": False,
             "num_experts_per_tok": 8,
         },
-        "kv": {"context_length": 4096, "batch_size": 1, "dtype_bytes": 2, "sink_tokens": 4},
+        "kv": {"context_length": 4096, "batch_size": 4, "dtype_bytes": 2, "sink_tokens": 4},
         "quant": {"group_size": 128, "scale_bits": 16, "zero_point_bits": 0},
-        "ground_set": {"weight_tiers": [2, 3, 4, 8, 16], "kv_tiers": [0.25, 0.5, 0.75, 1.0]},
+        "ground_set": {"weight_tiers": [3, 4, 8, 16], "kv_tiers": [0.25, 0.5, 0.75, 1.0]},
     }
     assert GroundSet.from_config(config).signature == ground_set.signature
 
@@ -255,6 +266,6 @@ def test_shipped_config_builds_the_expected_ground_set() -> None:
 
     config = load_config(Path(__file__).resolve().parents[1] / "configs" / "olmoe.yaml")
     built = GroundSet.from_config(config)
-    assert len(built.increments) == 112
+    assert len(built.increments) == 96
     assert built.base_cost_bytes() == HAND_BASE_BYTES
-    assert config["budgets"]["fractions"] == [0.15, 0.20, 0.25, 0.35]
+    assert config["budgets"]["fractions"] == [0.25, 0.35, 0.50, 0.70]
