@@ -229,10 +229,14 @@ def _merge_shards(args: argparse.Namespace, config: dict[str, Any]) -> None:
 
     payloads = [r["payload"][args.name] for r in found]
     merged = mergers[args.name](payloads)
+    # The merged record carries the configuration the shards actually ran, not
+    # whatever the config file says now. A run overridden on the command line
+    # would otherwise be written down with the wrong sequence count.
+    shard_config = {**found[0]["config"], "merged_from": [r["name"] for r in found]}
     with record(
         f"{args.name}__merged",
-        {**config, "merged_from": [r["name"] for r in found]},
-        int(config.get("seed", 0)),
+        shard_config,
+        int(shard_config.get("seed", 0)),
         args.results_dir,
     ) as entry:
         entry.payload[args.name] = merged
