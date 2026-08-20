@@ -1,0 +1,917 @@
+{
+  "name": "diagnostic_0_s1of2",
+  "git_commit": "75d4665af3d878dd56ddeab598087f13c97d4110-dirty",
+  "seed": 0,
+  "started_at": "20260820T210006Z",
+  "wall_clock_seconds": 287.41068184934556,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-60-generic-x86_64-with-glibc2.39",
+    "torch": "2.11.0+cu128",
+    "transformers": "5.15.1",
+    "mps_available": false,
+    "cuda_available": true
+  },
+  "config": {
+    "model": {
+      "name": "allenai/OLMoE-1B-7B-0924",
+      "num_hidden_layers": 16,
+      "hidden_size": 2048,
+      "intermediate_size": 1024,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 16,
+      "num_experts": 64,
+      "num_experts_per_tok": 8,
+      "vocab_size": 50304,
+      "max_position_embeddings": 4096,
+      "tie_word_embeddings": false,
+      "attention_bias": false,
+      "has_qk_norm": true,
+      "dtype_bytes": 2
+    },
+    "kv": {
+      "context_length": 4096,
+      "batch_size": 4,
+      "dtype_bytes": 2,
+      "sink_tokens": 4
+    },
+    "quant": {
+      "group_size": 128,
+      "scale_bits": 16,
+      "zero_point_bits": 0,
+      "symmetric": true,
+      "unquantized_bits": 16
+    },
+    "ground_set": {
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1
+    },
+    "budgets": {
+      "fractions": [
+        0.25,
+        0.35,
+        0.5,
+        0.7
+      ]
+    },
+    "seed": 0,
+    "retention": {
+      "policy": "recency_sink",
+      "sink_tokens": 4
+    },
+    "protocol": {
+      "name": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "chunk_size": 256
+    },
+    "calibration": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 16,
+      "full_sequences": 256,
+      "seed": 0
+    },
+    "runtime": {
+      "device": null,
+      "dtype": "bfloat16",
+      "attn_implementation": null,
+      "master_store": "memory"
+    },
+    "model_path": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+    "command": "diagnostic-0",
+    "shard": 1,
+    "num_shards": 2
+  },
+  "payload": {
+    "diagnostic_0": {
+      "reference_perplexity": 6.422963379119041,
+      "fidelity": "cheap",
+      "subsample": 0,
+      "shard": 1,
+      "num_shards": 2,
+      "num_probes_total": 144,
+      "num_probes_measured": 72,
+      "per_layer_weight": [
+        {
+          "layer": 0,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l00.b3",
+          "perplexity": 6.468158378068115,
+          "delta": 0.04519499894907408
+        },
+        {
+          "layer": 0,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l00.b8",
+          "perplexity": 6.41975382572095,
+          "delta": -0.003209553398090925
+        },
+        {
+          "layer": 1,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l01.b3",
+          "perplexity": 6.471913877897042,
+          "delta": 0.04895049877800073
+        },
+        {
+          "layer": 1,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l01.b8",
+          "perplexity": 6.422658275801046,
+          "delta": -0.000305103317995048
+        },
+        {
+          "layer": 2,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l02.b3",
+          "perplexity": 6.4990138277098115,
+          "delta": 0.07605044859077026
+        },
+        {
+          "layer": 2,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l02.b8",
+          "perplexity": 6.422077352807251,
+          "delta": -0.0008860263117904665
+        },
+        {
+          "layer": 3,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l03.b3",
+          "perplexity": 6.474215429804957,
+          "delta": 0.05125205068591576
+        },
+        {
+          "layer": 3,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l03.b8",
+          "perplexity": 6.426534907816481,
+          "delta": 0.0035715286974395966
+        },
+        {
+          "layer": 4,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l04.b3",
+          "perplexity": 6.509578629917729,
+          "delta": 0.0866152507986877
+        },
+        {
+          "layer": 4,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l04.b8",
+          "perplexity": 6.422096126483829,
+          "delta": -0.0008672526352118126
+        },
+        {
+          "layer": 5,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l05.b3",
+          "perplexity": 6.503796929201477,
+          "delta": 0.08083355008243576
+        },
+        {
+          "layer": 5,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l05.b8",
+          "perplexity": 6.423466290263151,
+          "delta": 0.0005029111441094969
+        },
+        {
+          "layer": 6,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l06.b3",
+          "perplexity": 6.540075116135835,
+          "delta": 0.11711173701679378
+        },
+        {
+          "layer": 6,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l06.b8",
+          "perplexity": 6.423982399549701,
+          "delta": 0.0010190204306601558
+        },
+        {
+          "layer": 7,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l07.b3",
+          "perplexity": 6.53921213719705,
+          "delta": 0.11624875807800894
+        },
+        {
+          "layer": 7,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l07.b8",
+          "perplexity": 6.4253636095703826,
+          "delta": 0.002400230451341301
+        },
+        {
+          "layer": 8,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l08.b3",
+          "perplexity": 6.5482564582357075,
+          "delta": 0.1252930791166662
+        },
+        {
+          "layer": 8,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l08.b8",
+          "perplexity": 6.425466169546152,
+          "delta": 0.0025027904271111012
+        },
+        {
+          "layer": 9,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l09.b3",
+          "perplexity": 6.566463865491796,
+          "delta": 0.14350048637275492
+        },
+        {
+          "layer": 9,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l09.b8",
+          "perplexity": 6.4244638511605485,
+          "delta": 0.0015004720415072725
+        },
+        {
+          "layer": 10,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l10.b3",
+          "perplexity": 6.588848157621255,
+          "delta": 0.16588477850221395
+        },
+        {
+          "layer": 10,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l10.b8",
+          "perplexity": 6.423110744559319,
+          "delta": 0.00014736544027815768
+        },
+        {
+          "layer": 11,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l11.b3",
+          "perplexity": 6.570617719146355,
+          "delta": 0.14765434002731403
+        },
+        {
+          "layer": 11,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l11.b8",
+          "perplexity": 6.424632416975033,
+          "delta": 0.0016690378559918173
+        },
+        {
+          "layer": 12,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l12.b3",
+          "perplexity": 6.564810651266248,
+          "delta": 0.14184727214720638
+        },
+        {
+          "layer": 12,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l12.b8",
+          "perplexity": 6.423274112215055,
+          "delta": 0.0003107330960139265
+        },
+        {
+          "layer": 13,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l13.b3",
+          "perplexity": 6.577147211869201,
+          "delta": 0.15418383275016012
+        },
+        {
+          "layer": 13,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l13.b8",
+          "perplexity": 6.4231187932479585,
+          "delta": 0.00015541412891728612
+        },
+        {
+          "layer": 14,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l14.b3",
+          "perplexity": 6.596383217024725,
+          "delta": 0.1734198379056835
+        },
+        {
+          "layer": 14,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l14.b8",
+          "perplexity": 6.420164375338684,
+          "delta": -0.0027990037803569123
+        },
+        {
+          "layer": 15,
+          "bits": 3,
+          "in_ground_set": true,
+          "probe": "d0.w.l15.b3",
+          "perplexity": 6.631841543331302,
+          "delta": 0.20887816421226102
+        },
+        {
+          "layer": 15,
+          "bits": 8,
+          "in_ground_set": true,
+          "probe": "d0.w.l15.b8",
+          "perplexity": 6.422427468726943,
+          "delta": -0.0005359103920978825
+        }
+      ],
+      "per_layer_kv": [
+        {
+          "layer": 0,
+          "retention": 0.5,
+          "probe": "d0.kv.l00.r0.5",
+          "perplexity": 6.44111262323816,
+          "delta": 0.01814924411911889
+        },
+        {
+          "layer": 1,
+          "retention": 0.25,
+          "probe": "d0.kv.l01.r0.25",
+          "perplexity": 6.44175324266393,
+          "delta": 0.018789863544888874
+        },
+        {
+          "layer": 1,
+          "retention": 0.75,
+          "probe": "d0.kv.l01.r0.75",
+          "perplexity": 6.426167732307155,
+          "delta": 0.003204353188113629
+        },
+        {
+          "layer": 2,
+          "retention": 0.5,
+          "probe": "d0.kv.l02.r0.5",
+          "perplexity": 6.441998128211323,
+          "delta": 0.019034749092281977
+        },
+        {
+          "layer": 3,
+          "retention": 0.25,
+          "probe": "d0.kv.l03.r0.25",
+          "perplexity": 6.500815159264138,
+          "delta": 0.07785178014509686
+        },
+        {
+          "layer": 3,
+          "retention": 0.75,
+          "probe": "d0.kv.l03.r0.75",
+          "perplexity": 6.422499281754404,
+          "delta": -0.0004640973646372615
+        },
+        {
+          "layer": 4,
+          "retention": 0.5,
+          "probe": "d0.kv.l04.r0.5",
+          "perplexity": 6.424669847103567,
+          "delta": 0.0017064679845253394
+        },
+        {
+          "layer": 5,
+          "retention": 0.25,
+          "probe": "d0.kv.l05.r0.25",
+          "perplexity": 6.449486514487308,
+          "delta": 0.026523135368266892
+        },
+        {
+          "layer": 5,
+          "retention": 0.75,
+          "probe": "d0.kv.l05.r0.75",
+          "perplexity": 6.426337241462252,
+          "delta": 0.0033738623432109094
+        },
+        {
+          "layer": 6,
+          "retention": 0.5,
+          "probe": "d0.kv.l06.r0.5",
+          "perplexity": 6.427610763389839,
+          "delta": 0.004647384270797694
+        },
+        {
+          "layer": 7,
+          "retention": 0.25,
+          "probe": "d0.kv.l07.r0.25",
+          "perplexity": 6.453859301964354,
+          "delta": 0.030895922845313173
+        },
+        {
+          "layer": 7,
+          "retention": 0.75,
+          "probe": "d0.kv.l07.r0.75",
+          "perplexity": 6.423586370106949,
+          "delta": 0.0006229909879076345
+        },
+        {
+          "layer": 8,
+          "retention": 0.5,
+          "probe": "d0.kv.l08.r0.5",
+          "perplexity": 6.424073925699112,
+          "delta": 0.0011105465800707037
+        },
+        {
+          "layer": 9,
+          "retention": 0.25,
+          "probe": "d0.kv.l09.r0.25",
+          "perplexity": 6.515870293350309,
+          "delta": 0.09290691423126773
+        },
+        {
+          "layer": 9,
+          "retention": 0.75,
+          "probe": "d0.kv.l09.r0.75",
+          "perplexity": 6.422934043398672,
+          "delta": -2.9335720369338958e-05
+        },
+        {
+          "layer": 10,
+          "retention": 0.5,
+          "probe": "d0.kv.l10.r0.5",
+          "perplexity": 6.427672735935869,
+          "delta": 0.0047093568168277145
+        },
+        {
+          "layer": 11,
+          "retention": 0.25,
+          "probe": "d0.kv.l11.r0.25",
+          "perplexity": 6.471731531208285,
+          "delta": 0.048768152089243344
+        },
+        {
+          "layer": 11,
+          "retention": 0.75,
+          "probe": "d0.kv.l11.r0.75",
+          "perplexity": 6.422181183278361,
+          "delta": -0.0007821958406806218
+        },
+        {
+          "layer": 12,
+          "retention": 0.5,
+          "probe": "d0.kv.l12.r0.5",
+          "perplexity": 6.444492377074195,
+          "delta": 0.02152899795515406
+        },
+        {
+          "layer": 13,
+          "retention": 0.25,
+          "probe": "d0.kv.l13.r0.25",
+          "perplexity": 6.52169389690879,
+          "delta": 0.09873051778974862
+        },
+        {
+          "layer": 13,
+          "retention": 0.75,
+          "probe": "d0.kv.l13.r0.75",
+          "perplexity": 6.421313703811737,
+          "delta": -0.0016496753073038661
+        },
+        {
+          "layer": 14,
+          "retention": 0.5,
+          "probe": "d0.kv.l14.r0.5",
+          "perplexity": 6.430950050586322,
+          "delta": 0.007986671467280715
+        },
+        {
+          "layer": 15,
+          "retention": 0.25,
+          "probe": "d0.kv.l15.r0.25",
+          "perplexity": 6.492716421177155,
+          "delta": 0.06975304205811383
+        },
+        {
+          "layer": 15,
+          "retention": 0.75,
+          "probe": "d0.kv.l15.r0.75",
+          "perplexity": 6.423320010768296,
+          "delta": 0.0003566316492547017
+        }
+      ],
+      "per_expert_weight": [
+        {
+          "layer": 0,
+          "expert": 1,
+          "bits": 2,
+          "probe": "d0.we.l00.e01.b2",
+          "perplexity": 6.425265069884719,
+          "delta": 0.0023016907656776553
+        },
+        {
+          "layer": 0,
+          "expert": 3,
+          "bits": 2,
+          "probe": "d0.we.l00.e03.b2",
+          "perplexity": 6.425117010444401,
+          "delta": 0.0021536313253598394
+        },
+        {
+          "layer": 0,
+          "expert": 5,
+          "bits": 2,
+          "probe": "d0.we.l00.e05.b2",
+          "perplexity": 6.430248969958311,
+          "delta": 0.007285590839269496
+        },
+        {
+          "layer": 0,
+          "expert": 7,
+          "bits": 2,
+          "probe": "d0.we.l00.e07.b2",
+          "perplexity": 6.424500200300379,
+          "delta": 0.0015368211813377997
+        },
+        {
+          "layer": 8,
+          "expert": 1,
+          "bits": 2,
+          "probe": "d0.we.l08.e01.b2",
+          "perplexity": 6.4313572155168615,
+          "delta": 0.008393836397820209
+        },
+        {
+          "layer": 8,
+          "expert": 3,
+          "bits": 2,
+          "probe": "d0.we.l08.e03.b2",
+          "perplexity": 6.423764280027349,
+          "delta": 0.0008009009083078666
+        },
+        {
+          "layer": 8,
+          "expert": 5,
+          "bits": 2,
+          "probe": "d0.we.l08.e05.b2",
+          "perplexity": 6.427283460384653,
+          "delta": 0.004320081265611897
+        },
+        {
+          "layer": 8,
+          "expert": 7,
+          "bits": 2,
+          "probe": "d0.we.l08.e07.b2",
+          "perplexity": 6.42361732330137,
+          "delta": 0.0006539441823285586
+        }
+      ],
+      "expert_group_weight": [
+        {
+          "layer": 0,
+          "group": 1,
+          "experts": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l00.g1.b3",
+          "perplexity": 6.430800459110497,
+          "delta": 0.007837079991455553
+        },
+        {
+          "layer": 0,
+          "group": 3,
+          "experts": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l00.g3.b3",
+          "perplexity": 6.424614783217128,
+          "delta": 0.0016514040980863953
+        },
+        {
+          "layer": 0,
+          "group": 5,
+          "experts": [
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l00.g5.b3",
+          "perplexity": 6.4346684668931715,
+          "delta": 0.011705087774130263
+        },
+        {
+          "layer": 0,
+          "group": 7,
+          "experts": [
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l00.g7.b3",
+          "perplexity": 6.419537742353178,
+          "delta": -0.0034256367658631603
+        },
+        {
+          "layer": 8,
+          "group": 1,
+          "experts": [
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l08.g1.b3",
+          "perplexity": 6.440341533615528,
+          "delta": 0.01737815449648661
+        },
+        {
+          "layer": 8,
+          "group": 3,
+          "experts": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l08.g3.b3",
+          "perplexity": 6.437273418215522,
+          "delta": 0.014310039096480764
+        },
+        {
+          "layer": 8,
+          "group": 5,
+          "experts": [
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l08.g5.b3",
+          "perplexity": 6.4304677910035535,
+          "delta": 0.00750441188451223
+        },
+        {
+          "layer": 8,
+          "group": 7,
+          "experts": [
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "bits": 3,
+          "probe": "d0.wg.l08.g7.b3",
+          "perplexity": 6.447843356413687,
+          "delta": 0.024879977294645528
+        }
+      ],
+      "summary": {
+        "weight_spread_by_bits": {
+          "2": {
+            "count": 0
+          },
+          "3": {
+            "count": 16,
+            "min": 0.04519499894907408,
+            "max": 0.20887816421226102,
+            "range": 0.16368316526318694,
+            "mean": 0.1176824427508717,
+            "stdev": 0.04880983662203662
+          },
+          "4": {
+            "count": 0
+          },
+          "8": {
+            "count": 16,
+            "min": -0.003209553398090925,
+            "max": 0.0035715286974395966,
+            "range": 0.006781082095530522,
+            "mean": 0.0003235408673641915,
+            "stdev": 0.001818973856549061
+          }
+        },
+        "kv_spread_by_retention": {
+          "0.25": {
+            "count": 8,
+            "min": 0.018789863544888874,
+            "max": 0.09873051778974862,
+            "range": 0.07994065424485974,
+            "mean": 0.058027416008992416,
+            "stdev": 0.031070828583705825
+          },
+          "0.5": {
+            "count": 8,
+            "min": 0.0011105465800707037,
+            "max": 0.02152899795515406,
+            "range": 0.020418451375083357,
+            "mean": 0.009859177285757137,
+            "stdev": 0.008360587505349688
+          },
+          "0.75": {
+            "count": 8,
+            "min": -0.0016496753073038661,
+            "max": 0.0033738623432109094,
+            "range": 0.0050235376505147755,
+            "mean": 0.0005790667419369733,
+            "stdev": 0.0018139573919036735
+          }
+        },
+        "expert_spread_by_layer": {
+          "0": {
+            "count": 4,
+            "min": 0.0015368211813377997,
+            "max": 0.007285590839269496,
+            "range": 0.005748769657931696,
+            "mean": 0.0033194335279111975,
+            "stdev": 0.0026647705155822305
+          },
+          "8": {
+            "count": 4,
+            "min": 0.0006539441823285586,
+            "max": 0.008393836397820209,
+            "range": 0.0077398922154916505,
+            "mean": 0.003542190688517133,
+            "stdev": 0.00365149363859604
+          }
+        },
+        "expert_group_spread_by_layer": {
+          "0": {
+            "count": 4,
+            "min": -0.0034256367658631603,
+            "max": 0.011705087774130263,
+            "range": 0.015130724539993423,
+            "mean": 0.004441983774452263,
+            "stdev": 0.006682468254803959
+          },
+          "8": {
+            "count": 4,
+            "min": 0.00750441188451223,
+            "max": 0.024879977294645528,
+            "range": 0.017375565410133298,
+            "mean": 0.016018145693031283,
+            "stdev": 0.007206084808186866
+          }
+        }
+      }
+    },
+    "setup": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 16,
+      "full_sequences": 256,
+      "calibration_seed": 0,
+      "calibration_windows": 593,
+      "evaluation_windows": 70,
+      "policy": "recency_sink",
+      "sink_tokens": 4,
+      "protocol": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "protocol_chunk_size": 256,
+      "context_length": 4096,
+      "sink_tokens_declared": 4,
+      "retention_by_layer": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "8": 1.0,
+        "9": 1.0,
+        "10": 1.0,
+        "11": 1.0,
+        "12": 1.0,
+        "13": 1.0,
+        "14": 1.0,
+        "15": 1.0
+      },
+      "group_size": 128,
+      "symmetric": true,
+      "unquantized_bits": 16,
+      "num_expert_modules": 16,
+      "experts_per_bit_width": {
+        "3": 8,
+        "16": 1016
+      },
+      "master_store": "memory",
+      "device": "cuda:1",
+      "resident_bytes": 12884901888,
+      "batch_size": 4,
+      "evaluation_count": 73
+    },
+    "ground_set": {
+      "signature": "2eb8f37ec9316e1f",
+      "model_name": "allenai/OLMoE-1B-7B-0924",
+      "num_units": 32,
+      "num_weight_units": 16,
+      "num_kv_units": 16,
+      "num_increments": 96,
+      "num_weight_increments": 48,
+      "num_kv_increments": 48,
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1,
+      "context_length": 4096,
+      "batch_size": 4,
+      "quant_group_size": 128,
+      "base_bytes": 4006875136,
+      "reference_bytes": 15985807360
+    },
+    "evaluation_count": 73
+  }
+}
