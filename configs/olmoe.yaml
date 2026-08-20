@@ -51,3 +51,23 @@ budgets:
   fractions: [0.15, 0.20, 0.25, 0.35]
 
 seed: 0
+
+retention:
+  # The retained set differs between policies, so the one in use is pinned here
+  # and copied into every result record. sink_tokens must match kv.sink_tokens.
+  policy: recency_sink
+  sink_tokens: 4
+  # attention_score also reads recent_window:
+  # policy: attention_score
+  # recent_window: 32
+
+runtime:
+  device: mps
+  dtype: float16
+  # attention_score needs eager, which is the only implementation that returns
+  # attention weights. recency_sink runs under sdpa.
+  attn_implementation: sdpa
+  # Only used by a policy that evicts between chunks.
+  chunk_size: 512
+  # Where the unmodified expert weights are held so any tier can be reapplied.
+  master_device: cpu

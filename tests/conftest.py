@@ -49,3 +49,55 @@ def quant_spec() -> QuantSpec:
 def ground_set(olmoe_model: ModelSpec, kv_spec: KVSpec, quant_spec: QuantSpec) -> GroundSet:
     """Return the default ground set for OLMoE-1B-7B."""
     return GroundSet(model=olmoe_model, kv=kv_spec, quant=quant_spec)
+
+
+TINY_ARCHITECTURE = dict(
+    hidden_size=32,
+    intermediate_size=16,
+    num_hidden_layers=3,
+    num_attention_heads=4,
+    num_key_value_heads=4,
+    num_experts=4,
+    num_experts_per_tok=2,
+    vocab_size=64,
+    max_position_embeddings=64,
+    eos_token_id=1,
+    pad_token_id=0,
+)
+
+
+def build_tiny_model(attn_implementation: str = "sdpa", seed: int = 0):
+    """Return a small randomly initialized OLMoE, which exercises the hooks without a download."""
+    import torch
+    from transformers.models.olmoe.modeling_olmoe import OlmoeConfig, OlmoeForCausalLM
+
+    config = OlmoeConfig(attn_implementation=attn_implementation, **TINY_ARCHITECTURE)
+    torch.manual_seed(seed)
+    return OlmoeForCausalLM(config).eval()
+
+
+@pytest.fixture
+def tiny_model():
+    """Return a small OLMoE using the default attention implementation."""
+    return build_tiny_model("sdpa")
+
+
+@pytest.fixture
+def tiny_model_eager():
+    """Return a small OLMoE using eager attention, which returns attention weights."""
+    return build_tiny_model("eager")
+
+
+@pytest.fixture
+def tiny_ids():
+    """Return one fixed token sequence of length 16."""
+    import torch
+
+    generator = torch.Generator().manual_seed(1234)
+    return torch.randint(0, TINY_ARCHITECTURE["vocab_size"], (1, 16), generator=generator)
+
+
+@pytest.fixture
+def tiny_kv() -> KVSpec:
+    """Return a KV spec whose context length matches the tiny sequence length."""
+    return KVSpec(context_length=16, batch_size=1, dtype_bytes=2, sink_tokens=2)

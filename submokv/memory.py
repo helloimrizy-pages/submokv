@@ -286,17 +286,24 @@ def expert_bytes(model: ModelSpec, quant: QuantSpec, bits: int, num_experts: int
     return per_expert * num_experts
 
 
-def retained_tokens(kv: KVSpec, retention: float) -> int:
+def retained_tokens(kv: KVSpec, retention: float, length: int | None = None) -> int:
     """Return the number of cached token positions kept at a retention ratio.
 
     The always-kept sink tokens count inside the retained budget rather than on
-    top of it, and the result never exceeds the declared context length.
+    top of it, and the result never exceeds the length it is measured against.
+    Byte accounting passes no length and so uses the declared context length.
+    The retention hooks pass the length of the sequence being processed, so a
+    ratio means the same share of the cache in both places.
     """
     if not 0.0 <= retention <= 1.0:
         raise ValueError(f"retention must lie in [0, 1], got {retention}")
-    tokens = math.ceil(retention * kv.context_length - _ROUNDING_TOLERANCE)
-    tokens = max(tokens, min(kv.sink_tokens, kv.context_length))
-    return min(tokens, kv.context_length)
+    if length is None:
+        length = kv.context_length
+    if length <= 0:
+        raise ValueError(f"length must be positive, got {length}")
+    tokens = math.ceil(retention * length - _ROUNDING_TOLERANCE)
+    tokens = max(tokens, min(kv.sink_tokens, length))
+    return min(tokens, length)
 
 
 def kv_bytes_per_layer(model: ModelSpec, kv: KVSpec, retention: float) -> int:
