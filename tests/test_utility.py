@@ -94,3 +94,24 @@ def test_the_one_step_conversion_is_the_thing_being_avoided() -> None:
     assert two_step == pytest.approx(values.float().sum().item(), rel=1e-6)
     if one_step == pytest.approx(two_step, rel=1e-6):
         pytest.skip("torch no longer corrupts the one step conversion on MPS")
+
+
+def test_the_device_is_chosen_when_the_config_names_none() -> None:
+    """The same config has to run on whatever machine holds the weights."""
+    from submokv.utility import default_device
+
+    chosen = default_device()
+    assert chosen in {"cuda", "mps", "cpu"}
+    if torch.cuda.is_available():
+        assert chosen == "cuda"
+    elif torch.backends.mps.is_available():
+        assert chosen == "mps"
+
+
+def test_the_shipped_config_pins_no_device() -> None:
+    from pathlib import Path
+
+    from submokv.cli import load_config
+
+    config = load_config(Path(__file__).resolve().parents[1] / "configs" / "olmoe.yaml")
+    assert config["runtime"]["device"] is None

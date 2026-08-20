@@ -28,6 +28,19 @@ CHEAP = "cheap"
 FULL = "full"
 
 
+def default_device() -> str:
+    """Return the accelerator to use when the config names none.
+
+    The project moves between machines, so the config leaves the device unset
+    and the run records which one it actually used.
+    """
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def total_in_float64(values: torch.Tensor) -> float:
     """Return the sum of a tensor as a Python float, accumulated in float64.
 
@@ -442,7 +455,7 @@ def build_utility(
     ground_set = GroundSet.from_config(config)
     runtime = dict(config.get("runtime", {}))
     source = str(model_path) if model_path is not None else ground_set.model.name
-    resolved_device = torch.device(device or runtime.get("device", "cpu"))
+    resolved_device = torch.device(device or runtime.get("device") or default_device())
     dtype = getattr(torch, str(runtime.get("dtype", "bfloat16")))
 
     policy = build_policy(config["retention"])

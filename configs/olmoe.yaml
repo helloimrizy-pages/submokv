@@ -84,7 +84,10 @@ calibration:
   seed: 0
 
 runtime:
-  device: mps
+  # Left unset so the same config runs on whatever machine holds the weights.
+  # The device that produced a number is recorded with it, and the memoization
+  # file is named for it, because results are not comparable across devices.
+  device: null
   # The checkpoint is bfloat16, so loading in bfloat16 converts nothing.
   dtype: bfloat16
   # attention_score needs eager, the only implementation that returns attention
