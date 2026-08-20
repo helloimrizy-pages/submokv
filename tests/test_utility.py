@@ -67,3 +67,30 @@ def test_fidelity_sizes(tmp_path) -> None:
     assert spec.size(FULL) == 4
     with pytest.raises(ValueError, match="unknown fidelity"):
         spec.size("guess")
+
+
+def test_summing_from_the_accelerator_widens_on_the_host() -> None:
+    """A one step device and dtype change silently corrupts float64 sums from MPS.
+
+    torch.Tensor.to("cpu", torch.float64) attempts the widening on the source
+    device, which has no float64, and returns reinterpreted bits rather than
+    raising. Every perplexity in the project flows through this sum.
+    """
+    from submokv.utility import total_in_float64
+
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    values = torch.rand(4, 1024, device=device) + 1.0
+    expected = values.float().sum().item()
+    assert total_in_float64(values) == pytest.approx(expected, rel=1e-6)
+
+
+def test_the_one_step_conversion_is_the_thing_being_avoided() -> None:
+    """Pin the behaviour that motivated the two step form, so a fix upstream is noticed."""
+    if not torch.backends.mps.is_available():
+        pytest.skip("the corruption only appears on MPS")
+    values = torch.rand(4, 1024, device="mps") + 1.0
+    one_step = values.detach().to("cpu", torch.float64).sum().item()
+    two_step = values.detach().cpu().to(torch.float64).sum().item()
+    assert two_step == pytest.approx(values.float().sum().item(), rel=1e-6)
+    if one_step == pytest.approx(two_step, rel=1e-6):
+        pytest.skip("torch no longer corrupts the one step conversion on MPS")

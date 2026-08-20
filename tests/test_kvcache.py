@@ -373,3 +373,67 @@ def test_an_unimplemented_protocol_is_refused() -> None:
 def test_a_prefix_that_swallows_the_sequence_is_refused() -> None:
     with pytest.raises(ValueError, match="leaves no tail"):
         EvaluationProtocol(prefill_tokens=16).scored_tokens(16)
+
+
+def test_the_single_pass_route_matches_the_chunked_route(tiny_model, tiny_ids, tiny_kv) -> None:
+    """One pass with the prefix exempted must compute what the two phase route computes."""
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    controller.set_uniform_retention(0.25)
+    single = score_sequence(tiny_model, tiny_ids, controller, route="single_pass")
+    chunked = score_sequence(tiny_model, tiny_ids, controller, route="chunked")
+    assert single.shape == chunked.shape == (1, 8)
+    assert torch.allclose(single, chunked, atol=CHUNK_TOLERANCE)
+
+
+def test_the_two_routes_agree_at_several_retention_ratios(tiny_model, tiny_ids, tiny_kv) -> None:
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=2)
+    controller = RetentionController(
+        tiny_model, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    for ratio in (0.25, 0.5, 0.75, 1.0):
+        controller.set_uniform_retention(ratio)
+        single = score_sequence(tiny_model, tiny_ids, controller, route="single_pass")
+        chunked = score_sequence(tiny_model, tiny_ids, controller, route="chunked")
+        assert torch.allclose(single, chunked, atol=CHUNK_TOLERANCE), ratio
+
+
+def test_a_score_based_policy_cannot_take_the_single_pass_route(
+    tiny_model_eager, tiny_ids, tiny_kv
+) -> None:
+    controller = RetentionController(
+        tiny_model_eager, AttentionScorePolicy(sink_tokens=2), tiny_kv,
+        EvaluationProtocol(prefill_tokens=8, chunk_size=4),
+    ).attach()
+    controller.set_uniform_retention(0.5)
+    with pytest.raises(ValueError, match="cannot run in one pass"):
+        score_sequence(tiny_model_eager, tiny_ids, controller, route="single_pass")
+
+
+def test_the_prefix_is_not_masked_in_the_single_pass_route(
+    tiny_model_eager, tiny_ids, tiny_kv
+) -> None:
+    """Prefill queries must see everything causally even while tail queries are masked."""
+    recorded: dict[str, torch.Tensor] = {}
+
+    def record(module, args, kwargs, output):
+        recorded["weights"] = output[1].detach()
+
+    protocol = EvaluationProtocol(prefill_tokens=8, chunk_size=4)
+    controller = RetentionController(
+        tiny_model_eager, RecencySinkPolicy(sink_tokens=2), tiny_kv, protocol
+    ).attach()
+    controller.set_uniform_retention(0.25)
+    handle = tiny_model_eager.model.layers[0].self_attn.register_forward_hook(
+        record, with_kwargs=True
+    )
+    score_sequence(tiny_model_eager, tiny_ids, controller, route="single_pass")
+    handle.remove()
+
+    attended = (recorded["weights"][0, 0] > 1e-12).sum(-1).tolist()
+    # Queries 0 to 7 are prefix and attend to their whole causal history.
+    assert attended[:8] == [1, 2, 3, 4, 5, 6, 7, 8]
+    # Queries 8 onward are tail and are held to the budget of four.
+    assert max(attended[8:]) <= controller.budget_tokens(0, 16)

@@ -362,6 +362,8 @@ class RetentionController:
         self._sequence_length: int | None = None
         self._attention_weights: dict[int, torch.Tensor] = {}
         self._masking_enabled = True
+        self._exempt_below: int = 0
+        self._mask_cache: dict[tuple[Any, ...], torch.Tensor] = {}
 
     @property
     def layers(self) -> tuple[int, ...]:
@@ -423,6 +425,7 @@ class RetentionController:
         """Reset per-sequence policy state before processing a new batch of sequences."""
         self._sequence_length = sequence_length
         self._attention_weights = {}
+        self._mask_cache = {}
         self._state = {
             layer: PolicyState(
                 batch_size=batch_size,
@@ -433,6 +436,17 @@ class RetentionController:
             )
             for layer in self.layers
         }
+
+    def set_prefill_exemption(self, positions: int) -> None:
+        """Let queries below a position attend to everything causally.
+
+        The protocol prefills a prefix with full attention. When the retained
+        set depends only on position, the prefix and the tail can share one
+        forward pass, and the exemption is what keeps the prefix unmasked
+        inside it.
+        """
+        self._exempt_below = int(positions)
+        self._mask_cache = {}
 
     def set_masking(self, enabled: bool) -> None:
         """Switch the retention mask on or off, leaving score accumulation running.
@@ -501,9 +515,24 @@ class RetentionController:
             sequence_length = self._sequence_length or key_length
             budget = retained_tokens(self.kv, ratio, length=sequence_length)
 
-            allowed = self.policy.allowed(query_positions, key_length, budget, self._state.get(layer))
-            while allowed.ndim < 4:
-                allowed = allowed.unsqueeze(0)
+            # A policy whose retained set depends only on position gives every
+            # layer at the same ratio the same mask, so it is built once.
+            cacheable = not self.policy.needs_attention_scores
+            cache_key = (ratio, key_length, int(query_positions[0]), int(query_positions.numel()))
+            allowed = self._mask_cache.get(cache_key) if cacheable else None
+            if allowed is None:
+                allowed = self.policy.allowed(
+                    query_positions, key_length, budget, self._state.get(layer)
+                )
+                if self._exempt_below > 0:
+                    keys = torch.arange(key_length, device=query_positions.device)
+                    causal = keys.reshape(1, -1) <= query_positions.reshape(-1, 1)
+                    exempt = query_positions.reshape(-1, 1) < self._exempt_below
+                    allowed = allowed | (causal & exempt)
+                while allowed.ndim < 4:
+                    allowed = allowed.unsqueeze(0)
+                if cacheable:
+                    self._mask_cache[cache_key] = allowed
 
             # transformers hands the attention module a boolean mask on some
             # paths and an additive float mask on others, and no mask at all
@@ -607,6 +636,7 @@ def score_sequence(
     model: nn.Module,
     input_ids: torch.Tensor,
     controller: RetentionController,
+    route: str = "auto",
 ) -> torch.Tensor:
     """Return the per-token negative log likelihood of the scored tail of each sequence.
 
@@ -617,6 +647,11 @@ def score_sequence(
     score re-evicts between chunks with room reserved for the positions the next
     chunk adds, so the visible cache never rises above the budget at the moment
     attention is computed.
+
+    A policy whose retained set depends only on position takes one pass over the
+    whole sequence, with prefix queries exempted from the mask. Passing
+    route="chunked" forces the two phase route instead, which is how the two are
+    checked against each other.
 
     Returns a float32 tensor of shape (batch, sequence_length - prefill_tokens).
     """
@@ -633,6 +668,38 @@ def score_sequence(
     needs_scores = controller.policy.needs_attention_scores
 
     controller.begin_sequence(batch, total, device)
+
+    if route not in ("auto", "single_pass", "chunked"):
+        raise ValueError(f"unknown route {route!r}")
+    if route == "single_pass" and needs_scores:
+        raise ValueError(
+            f"the {controller.policy.name} policy evicts between chunks and cannot run in one pass"
+        )
+    if route != "chunked" and not needs_scores:
+        # The retained set depends only on position, so the prefix and the tail
+        # go through in one pass: prefix queries are exempted from the mask and
+        # tail queries carry it. This is the same computation as the chunked
+        # route with one reduction order instead of several, and it avoids
+        # growing the cache a chunk at a time.
+        controller.set_masking(True)
+        controller.set_prefill_exemption(prefill)
+        # The first token of a sequence has no prediction to be scored against.
+        first_scored = max(prefill, 1)
+        keep = total - first_scored + 1
+        try:
+            with torch.no_grad():
+                logits = model(input_ids=input_ids, use_cache=False, logits_to_keep=keep).logits
+            step_logits = logits[:, :-1]
+            targets = input_ids[:, first_scored:]
+            token_loss = torch.nn.functional.cross_entropy(
+                step_logits.reshape(-1, step_logits.shape[-1]).float(),
+                targets.reshape(-1),
+                reduction="none",
+            )
+            return token_loss.reshape(batch, -1)
+        finally:
+            controller.set_prefill_exemption(0)
+
     cache = DynamicCache()
     previous_logit: torch.Tensor | None = None
 

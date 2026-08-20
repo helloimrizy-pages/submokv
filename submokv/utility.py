@@ -28,6 +28,18 @@ CHEAP = "cheap"
 FULL = "full"
 
 
+def total_in_float64(values: torch.Tensor) -> float:
+    """Return the sum of a tensor as a Python float, accumulated in float64.
+
+    The move to the host and the widening to float64 are separate steps on
+    purpose. Asking for both at once, as values.to("cpu", torch.float64),
+    silently returns garbage when the source is on MPS: that backend has no
+    float64, and the conversion is attempted before the copy. It does not
+    raise, so the wrong number reaches the results table looking ordinary.
+    """
+    return float(values.detach().cpu().to(torch.float64).sum().item())
+
+
 @dataclass(frozen=True)
 class CalibrationSpec:
     """Which sequences F reads and which sequences results are reported on."""
@@ -294,7 +306,7 @@ class UtilityFunction:
                 # than the accounting charges for, so it is dropped.
                 break
             losses = score_sequence(self.model, batch, self.controller)
-            total_nll += float(losses.detach().to("cpu", torch.float64).sum().item())
+            total_nll += total_in_float64(losses)
             total_tokens += int(losses.numel())
         seconds = time.perf_counter() - start
 

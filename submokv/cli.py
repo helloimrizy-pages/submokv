@@ -133,6 +133,8 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
 
     model_path = resolve_model_path(config, args.model_path)
     seed = int(config.get("seed", 0))
+    if getattr(args, "sequences", None):
+        config = {**config, "calibration": {**config["calibration"], "cheap_sequences": args.sequences}}
     _, utility = build_utility(config, model_path=model_path, device=args.device)
 
     full_config = {**config, "model_path": model_path, "command": args.command}
@@ -179,6 +181,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("--model-path", type=Path, default=None)
         sub.add_argument("--device", type=str, default=None)
+        sub.add_argument(
+            "--sequences",
+            type=int,
+            default=None,
+            help="override calibration.cheap_sequences for this run",
+        )
         if name == "noise-floor":
             sub.add_argument("--sizes", type=str, default="16,32,64")
             sub.add_argument("--subsamples", type=int, default=6)
