@@ -139,7 +139,21 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
 
     full_config = {**config, "model_path": model_path, "command": args.command}
     with record(args.command.replace("-", "_"), full_config, seed) as entry:
-        if args.command == "noise-floor":
+        if args.command == "noise-floor" and args.paired:
+            from .diagnostics import paired_noise_floor, top_retention, top_weight_plan
+
+            ground = utility.ground_set
+            middle = ground.model.num_hidden_layers // 2
+            weight_probe = top_weight_plan(ground)
+            weight_probe[middle] = {e: 3 for e in range(ground.model.num_experts)}
+            kv_probe = top_retention(ground)
+            kv_probe[middle] = 0.25
+            probes = {
+                f"d0.w.l{middle:02d}.b3": (weight_probe, top_retention(ground)),
+                f"d0.kv.l{middle:02d}.r0.25": (top_weight_plan(ground), kv_probe),
+            }
+            entry.payload["paired"] = paired_noise_floor(utility, probes, args.subsamples)
+        elif args.command == "noise-floor":
             sizes = [int(part) for part in args.sizes.split(",")]
             entry.payload["sweep"] = noise_floor_sweep(utility, sizes, args.subsamples)
             entry.payload["determinism"] = utility.verify_determinism(
@@ -190,6 +204,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if name == "noise-floor":
             sub.add_argument("--sizes", type=str, default="16,32,64")
             sub.add_argument("--subsamples", type=int, default=6)
+            sub.add_argument(
+                "--paired",
+                action="store_true",
+                help="measure the spread of a drop-from-top difference instead of the sweep",
+            )
         if name == "diagnostic-0":
             sub.add_argument("--expert-layers", type=str, default="0,8")
             sub.add_argument("--expert-sample", type=int, default=8)
