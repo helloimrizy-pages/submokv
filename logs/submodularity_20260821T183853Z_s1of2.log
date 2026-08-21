@@ -1,0 +1,54 @@
+Loading weights:   0%|          | 0/179 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/179 [00:05<03:44,  1.28s/it]Loading weights:   3%|▎         | 5/179 [00:15<10:30,  3.62s/it]Loading weights:   8%|▊         | 15/179 [00:19<03:01,  1.11s/it]Loading weights:   9%|▉         | 16/179 [00:28<05:05,  1.87s/it]Loading weights:  15%|█▍        | 26/179 [00:32<02:32,  1.01it/s]Loading weights:  15%|█▌        | 27/179 [00:41<04:10,  1.65s/it]Loading weights:  21%|██        | 37/179 [00:46<02:23,  1.01s/it]Loading weights:  21%|██        | 38/179 [00:55<03:48,  1.62s/it]Loading weights:  27%|██▋       | 48/179 [01:00<02:14,  1.03s/it]Loading weights:  27%|██▋       | 49/179 [01:06<03:01,  1.40s/it]Loading weights:  33%|███▎      | 59/179 [01:08<01:34,  1.27it/s]Loading weights:  34%|███▎      | 60/179 [01:12<01:58,  1.01it/s]Loading weights:  39%|███▉      | 70/179 [01:15<01:11,  1.52it/s]Loading weights:  40%|███▉      | 71/179 [01:22<01:57,  1.09s/it]Loading weights:  45%|████▌     | 81/179 [01:25<01:11,  1.36it/s]Loading weights:  46%|████▌     | 82/179 [01:34<01:59,  1.23s/it]Loading weights:  51%|█████▏    | 92/179 [01:38<01:13,  1.18it/s]Loading weights:  52%|█████▏    | 93/179 [01:46<01:50,  1.28s/it]Loading weights:  58%|█████▊    | 103/179 [01:49<01:03,  1.20it/s]Loading weights:  58%|█████▊    | 104/179 [01:56<01:31,  1.21s/it]Loading weights:  64%|██████▎   | 114/179 [01:59<00:51,  1.26it/s]Loading weights:  64%|██████▍   | 115/179 [02:07<01:19,  1.24s/it]Loading weights:  70%|██████▉   | 125/179 [02:11<00:44,  1.20it/s]Loading weights:  70%|███████   | 126/179 [02:20<01:10,  1.33s/it]Loading weights:  76%|███████▌  | 136/179 [02:24<00:38,  1.11it/s]Loading weights:  77%|███████▋  | 137/179 [02:33<01:00,  1.44s/it]Loading weights:  82%|████████▏ | 147/179 [02:38<00:31,  1.03it/s]Loading weights:  83%|████████▎ | 148/179 [02:48<00:47,  1.53s/it]Loading weights:  88%|████████▊ | 158/179 [02:52<00:21,  1.01s/it]Loading weights:  89%|████████▉ | 159/179 [03:02<00:31,  1.56s/it]Loading weights:  94%|█████████▍| 169/179 [03:06<00:10,  1.01s/it]Loading weights:  95%|█████████▍| 170/179 [03:14<00:13,  1.51s/it]Loading weights: 100%|██████████| 179/179 [03:14<00:00,  1.09s/it]
+[  1/16] L2 (KV:0.25->0.50) | L2 (W:2->16)
+[  2/16] L6 (KV:0.25->0.50) | L6 (W:2->16)
+[  3/16] L10 (KV:0.25->0.50) | L10 (W:2->16)
+[  4/16] L14 (KV:0.25->0.50) | L14 (W:2->16)
+[  5/16] L2 (W:2->4) | L10 (W:2->16)
+[  6/16] L6 (W:2->4) | L2 (W:2->16)
+[  7/16] L6 (W:2->4) | L14 (W:2->16)
+[  8/16] L10 (W:2->4) | L6 (W:2->16)
+[  9/16] L14 (W:2->4) | L2 (W:2->16)
+[ 10/16] L14 (W:2->4) | L10 (W:2->16)
+[ 11/16] L2 (KV:0.25->0.50) | L10 (KV:0.25->1)
+[ 12/16] L6 (KV:0.25->0.50) | L2 (KV:0.25->1)
+[ 13/16] L6 (KV:0.25->0.50) | L14 (KV:0.25->1)
+[ 14/16] L10 (KV:0.25->0.50) | L6 (KV:0.25->1)
+[ 15/16] L14 (KV:0.25->0.50) | L2 (KV:0.25->1)
+[ 16/16] L14 (KV:0.25->0.50) | L10 (KV:0.25->1)
+============================================================================================================================
+                                          SUB-MoKV SUBMODULARITY DIAGNOSTIC REPORT                                          
+============================================================================================================================
+                                  PARTIAL SHARD 2/2 — VERDICT IS PRELIMINARY UNTIL MERGED                                   
+Model: allenai/OLMoE-1B-7B-0924 | Sequences: 8 | Length: 2048 | epsilon: 0.01 PPL
+----------------------------------------------------------------------------------------------------------------------------
+Layer Pair / Modality                                       | Delta(j|S_A) | Delta(j|S_B) |   Diff (A-B) | Classification
+----------------------------------------------------------------------------------------------------------------------------
+[KV|W] L2 (KV:0.25->0.50) | L2 (W:2->16)                    |      +0.0128 |      +0.0182 |      -0.0054 | Submodular
+[KV|W] L6 (KV:0.25->0.50) | L6 (W:2->16)                    |      +0.0154 |      +0.0140 |      +0.0014 | Submodular
+[KV|W] L10 (KV:0.25->0.50) | L10 (W:2->16)                  |      +0.0598 |      +0.0577 |      +0.0021 | Submodular
+[KV|W] L14 (KV:0.25->0.50) | L14 (W:2->16)                  |      +0.0632 |      +0.0582 |      +0.0050 | Submodular
+[W|W] L2 (W:2->4) | L10 (W:2->16)                           |      +0.5352 |      +0.5131 |      +0.0221 | Submodular
+[W|W] L6 (W:2->4) | L2 (W:2->16)                            |      +0.4855 |      +0.3815 |      +0.1040 | Submodular
+[W|W] L6 (W:2->4) | L14 (W:2->16)                           |      +0.4344 |      +0.3815 |      +0.0528 | Submodular
+[W|W] L10 (W:2->4) | L6 (W:2->16)                           |      +0.7367 |      +0.6621 |      +0.0746 | Submodular
+[W|W] L14 (W:2->4) | L2 (W:2->16)                           |      +0.9494 |      +0.9688 |      -0.0194 | SUPERMODULAR *
+[W|W] L14 (W:2->4) | L10 (W:2->16)                          |      +1.1282 |      +0.9688 |      +0.1594 | Submodular
+[KV|KV] L2 (KV:0.25->0.50) | L10 (KV:0.25->1)               |      +0.0127 |      +0.0182 |      -0.0055 | Submodular
+[KV|KV] L6 (KV:0.25->0.50) | L2 (KV:0.25->1)                |      +0.0143 |      +0.0140 |      +0.0004 | Submodular
+[KV|KV] L6 (KV:0.25->0.50) | L14 (KV:0.25->1)               |      +0.0086 |      +0.0140 |      -0.0054 | Submodular
+[KV|KV] L10 (KV:0.25->0.50) | L6 (KV:0.25->1)               |      +0.0597 |      +0.0577 |      +0.0019 | Submodular
+[KV|KV] L14 (KV:0.25->0.50) | L2 (KV:0.25->1)               |      +0.0582 |      +0.0582 |      +0.0000 | Submodular
+[KV|KV] L14 (KV:0.25->0.50) | L10 (KV:0.25->1)              |      +0.0630 |      +0.0582 |      +0.0049 | Submodular
+----------------------------------------------------------------------------------------------------------------------------
+SUMMARY:
+- Total Interactions Tested: 16
+- Submodular Pairs: 15 (93.75%)
+- Supermodular Pairs (strict violations): 4 (25.00%)
+- Significant Violations Beyond Epsilon: 1 (6.25%; 3 strict violations fall inside epsilon)
+- Negative Marginal Gains: 0/32
+- Empirical Pairwise Gamma: 0.6136
+
+DECISION VERDICT: NEAR-SUBMODULAR / WEAKLY SUBMODULAR
+-> Action: Proceed with the method-paper hypothesis, then estimate a formal submodularity ratio before claiming greedy bounds.
+============================================================================================================================
+JSON log: /workspace/submokv/results/submodularity_20260821T183853Z_s1of2.json

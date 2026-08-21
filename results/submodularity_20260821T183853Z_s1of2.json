@@ -1,0 +1,1897 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-08-21T18:44:55Z",
+  "definition": {
+    "utility": "F(S) = PPL(full 16-bit/100% KV) - PPL(S) = -DeltaPPL",
+    "marginal_s_a": "F(S_A union {j}) - F(S_A)",
+    "marginal_s_b": "F(S_B union {j}) - F(S_B)",
+    "second_order_difference": "marginal_s_a - marginal_s_b",
+    "submodular_test": "second_order_difference >= -epsilon"
+  },
+  "model": {
+    "name": "allenai/OLMoE-1B-7B-0924",
+    "num_hidden_layers": 16,
+    "num_experts": 64
+  },
+  "calibration": {
+    "dataset": "Salesforce/wikitext",
+    "subset": "wikitext-2-raw-v1",
+    "calibration_split": "validation",
+    "evaluation_split": "test",
+    "sequence_length": 2048,
+    "cheap_sequences": 8,
+    "full_sequences": 256,
+    "calibration_seed": 0,
+    "fidelity": "cheap",
+    "subsample": 0
+  },
+  "test_layers": [
+    2,
+    6,
+    10,
+    14
+  ],
+  "epsilon_ppl": 0.01,
+  "reference": {
+    "perplexity": 6.880005018654275,
+    "mean_nll": 1.9286193814005494,
+    "num_sequences": 8,
+    "num_scored_tokens": 4096,
+    "fidelity": "cheap",
+    "subsample": 0,
+    "seconds": 6.202268688008189,
+    "utility": 0.0,
+    "allocation_delta_from_full": {
+      "weight_bits": {},
+      "kv_retention": {}
+    }
+  },
+  "interactions": [
+    {
+      "interaction_id": "kv_given_weight.t02.kv0p25to0p50.c02.w2to16",
+      "modality": "kv_given_weight",
+      "target_layer": 2,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 2,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L2 (KV:0.25->0.50) | L2 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.401827740077794,
+          "mean_nll": 2.0017269616150504,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9441905049607158,
+          "perplexity_degradation": 0.5218227214235185,
+          "utility": -0.5218227214235185,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2
+            },
+            "kv_retention": {
+              "2": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.38902676049617,
+          "mean_nll": 1.9999960294667773,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9737578961066902,
+          "perplexity_degradation": 0.5090217418418952,
+          "utility": -0.5090217418418952,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2
+            },
+            "kv_retention": {
+              "2": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.898836650191763,
+          "mean_nll": 1.9313527959669126,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0045298435725272,
+          "perplexity_degradation": 0.01883163153748768,
+          "utility": -0.01883163153748768,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.880659786957794,
+          "mean_nll": 1.9287145466143327,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9416925539262593,
+          "perplexity_degradation": 0.0006547683035185159,
+          "utility": -0.0006547683035185159,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.012800979581623295,
+      "marginal_gain_s_b": 0.018176863233969165,
+      "second_order_difference": -0.00537588365234587,
+      "classification": "submodular",
+      "strict_supermodular": true,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_given_weight.t06.kv0p25to0p50.c06.w2to16",
+      "modality": "kv_given_weight",
+      "target_layer": 6,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 6,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L6 (KV:0.25->0.50) | L6 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.290393854464698,
+          "mean_nll": 1.98655757123672,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0685318256728351,
+          "perplexity_degradation": 0.41038883581042285,
+          "utility": -0.41038883581042285,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2
+            },
+            "kv_retention": {
+              "6": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.274979321123751,
+          "mean_nll": 1.9844409705963,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9395983261056244,
+          "perplexity_degradation": 0.3949743024694756,
+          "utility": -0.3949743024694756,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2
+            },
+            "kv_retention": {
+              "6": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.9020189867436965,
+          "mean_nll": 1.9318139755766492,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9419354354031384,
+          "perplexity_degradation": 0.022013968089421354,
+          "utility": -0.022013968089421354,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.88804422353656,
+          "mean_nll": 1.9297871874788841,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9379169032908976,
+          "perplexity_degradation": 0.0080392048822846,
+          "utility": -0.0080392048822846,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.015414533340947223,
+      "marginal_gain_s_b": 0.013974763207136753,
+      "second_order_difference": 0.0014397701338104696,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_given_weight.t10.kv0p25to0p50.c10.w2to16",
+      "modality": "kv_given_weight",
+      "target_layer": 10,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 10,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L10 (KV:0.25->0.50) | L10 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.63614510675459,
+          "mean_nll": 2.0328929086628564,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0707013122737408,
+          "perplexity_degradation": 0.7561400881003149,
+          "utility": -0.7561400881003149,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 2
+            },
+            "kv_retention": {
+              "10": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.576345149499145,
+          "mean_nll": 2.0250309131220527,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.1107960017398,
+          "perplexity_degradation": 0.6963401308448702,
+          "utility": -0.6963401308448702,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 2
+            },
+            "kv_retention": {
+              "10": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.9689944903203624,
+          "mean_nll": 1.941470951857757,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.986978854984045,
+          "perplexity_degradation": 0.08898947166608728,
+          "utility": -0.08898947166608728,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.911275833158292,
+          "mean_nll": 1.9331542565046973,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9436868680641055,
+          "perplexity_degradation": 0.03127081450401725,
+          "utility": -0.03127081450401725,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.059799957255444625,
+      "marginal_gain_s_b": 0.05771865716207003,
+      "second_order_difference": 0.002081300093374594,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_given_weight.t14.kv0p25to0p50.c14.w2to16",
+      "modality": "kv_given_weight",
+      "target_layer": 14,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 14,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L14 (KV:0.25->0.50) | L14 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.918957724221214,
+          "mean_nll": 2.0692595966891125,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9791009370237589,
+          "perplexity_degradation": 1.0389527055669392,
+          "utility": -1.0389527055669392,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 2
+            },
+            "kv_retention": {
+              "14": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.855784489342386,
+          "mean_nll": 2.0612501380565336,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.1424260968342423,
+          "perplexity_degradation": 0.9757794706881109,
+          "utility": -0.9757794706881109,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 2
+            },
+            "kv_retention": {
+              "14": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.932596302936988,
+          "mean_nll": 1.9362343899276442,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9883873681537807,
+          "perplexity_degradation": 0.052591284282712536,
+          "utility": -0.052591284282712536,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.874444731947088,
+          "mean_nll": 1.927810874028623,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9412465319037437,
+          "perplexity_degradation": -0.00556028670718689,
+          "utility": 0.00556028670718689,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.06317323487882831,
+      "marginal_gain_s_b": 0.058151570989899426,
+      "second_order_difference": 0.0050216638889288845,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t02.w2to4.c10.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 2,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 10,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L2 (W:2->4) | L10 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 8.104161151045362,
+          "mean_nll": 2.09237765211952,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9504805309697986,
+          "perplexity_degradation": 1.2241561323910872,
+          "utility": -1.2241561323910872,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2,
+              "10": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.568921162612178,
+          "mean_nll": 2.024050542446676,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.049094928894192,
+          "perplexity_degradation": 0.6889161439579032,
+          "utility": -0.6889161439579032,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 4,
+              "10": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.407624773171906,
+          "mean_nll": 2.002509844491377,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9343027849681675,
+          "perplexity_degradation": 0.5276197545176311,
+          "utility": -0.5276197545176311,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.8945043705475015,
+          "mean_nll": 1.9307246262174362,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9365993612445891,
+          "perplexity_degradation": 0.014499351893226375,
+          "utility": -0.014499351893226375,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.535239988433184,
+      "marginal_gain_s_b": 0.5131204026244047,
+      "second_order_difference": 0.022119585808779263,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t06.w2to4.c02.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 6,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 2,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L6 (W:2->4) | L2 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.898081192638062,
+          "mean_nll": 2.066619842963309,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9343905374407768,
+          "perplexity_degradation": 1.0180761739837871,
+          "utility": -1.0180761739837871,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2,
+              "6": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.412588355745157,
+          "mean_nll": 2.003179684083516,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9348238962702453,
+          "perplexity_degradation": 0.5325833370908821,
+          "utility": -0.5325833370908821,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2,
+              "6": 4
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.26967093216541,
+          "mean_nll": 1.9837110267198097,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0383084821514785,
+          "perplexity_degradation": 0.3896659135111351,
+          "utility": -0.3896659135111351,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.888156739882457,
+          "mean_nll": 1.9298035223663033,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9581540967337787,
+          "perplexity_degradation": 0.008151721228181863,
+          "utility": -0.008151721228181863,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.485492836892905,
+      "marginal_gain_s_b": 0.38151419228295325,
+      "second_order_difference": 0.10397864460995176,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t06.w2to4.c14.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 6,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 14,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L6 (W:2->4) | L14 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 8.309376794262878,
+          "mean_nll": 2.117384611381575,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9672359870746732,
+          "perplexity_degradation": 1.4293717756086028,
+          "utility": -1.4293717756086028,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2,
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.875019733281083,
+          "mean_nll": 2.063695690522028,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9722549319267273,
+          "perplexity_degradation": 0.9950147146268078,
+          "utility": -0.9950147146268078,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 4,
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.26967093216541,
+          "mean_nll": 1.9837110267198097,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0383084821514785,
+          "perplexity_degradation": 0.3896659135111351,
+          "utility": -0.3896659135111351,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.888156739882457,
+          "mean_nll": 1.9298035223663033,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9581540967337787,
+          "perplexity_degradation": 0.008151721228181863,
+          "utility": -0.008151721228181863,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.43435706098179505,
+      "marginal_gain_s_b": 0.38151419228295325,
+      "second_order_difference": 0.052842868698841805,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t10.w2to4.c06.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 10,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 6,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L10 (W:2->4) | L6 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 8.027618139458117,
+          "mean_nll": 2.0828878637163566,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9910611412487924,
+          "perplexity_degradation": 1.1476131208038414,
+          "utility": -1.1476131208038414,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2,
+              "10": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.290891604462316,
+          "mean_nll": 1.9866258436807667,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.051671371795237,
+          "perplexity_degradation": 0.4108865858080408,
+          "utility": -0.4108865858080408,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "6": 2,
+              "10": 4
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.54675922117119,
+          "mean_nll": 2.0211182288811353,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9361132811754942,
+          "perplexity_degradation": 0.6667542025169144,
+          "utility": -0.6667542025169144,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.884649889826791,
+          "mean_nll": 1.9292942797368617,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0233472492545843,
+          "perplexity_degradation": 0.004644871172516218,
+          "utility": -0.004644871172516218,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.7367265349958005,
+      "marginal_gain_s_b": 0.6621093313443982,
+      "second_order_difference": 0.07461720365140234,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t14.w2to4.c02.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 14,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 2,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L14 (W:2->4) | L2 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 8.37385847201176,
+          "mean_nll": 2.125114766571847,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.935794027056545,
+          "perplexity_degradation": 1.4938534533574845,
+          "utility": -1.4938534533574845,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2,
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.424439734902948,
+          "mean_nll": 2.004777225263045,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9459180771373212,
+          "perplexity_degradation": 0.5444347162486727,
+          "utility": -0.5444347162486727,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "2": 2,
+              "14": 4
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.8659809073597255,
+          "mean_nll": 2.0625472467704307,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9368229419924319,
+          "perplexity_degradation": 0.9859758887054504,
+          "utility": -0.9859758887054504,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.897157713630541,
+          "mean_nll": 1.9311094011777827,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9367476389743388,
+          "perplexity_degradation": 0.017152694976266147,
+          "utility": -0.017152694976266147,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.9494187371088119,
+      "marginal_gain_s_b": 0.9688231937291842,
+      "second_order_difference": -0.01940445662037238,
+      "classification": "supermodular",
+      "strict_supermodular": true,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "weight_to_weight.t14.w2to4.c10.w2to16",
+      "modality": "weight_to_weight",
+      "target_layer": 14,
+      "target_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 4
+      },
+      "conditioning_layer": 10,
+      "conditioning_upgrade": {
+        "kind": "weight",
+        "from": 2,
+        "to": 16
+      },
+      "label": "L14 (W:2->4) | L10 (W:2->16)",
+      "states": {
+        "s_a": {
+          "perplexity": 8.69156145511981,
+          "mean_nll": 2.162352607269505,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9368712077848613,
+          "perplexity_degradation": 1.8115564364655352,
+          "utility": -1.8115564364655352,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 2,
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 7.563360229321519,
+          "mean_nll": 2.0233155662197664,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9372357148677111,
+          "perplexity_degradation": 0.6833552106672443,
+          "utility": -0.6833552106672443,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "10": 2,
+              "14": 4
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b": {
+          "perplexity": 7.8659809073597255,
+          "mean_nll": 2.0625472467704307,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9368229419924319,
+          "perplexity_degradation": 0.9859758887054504,
+          "utility": -0.9859758887054504,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 2
+            },
+            "kv_retention": {}
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.897157713630541,
+          "mean_nll": 1.9311094011777827,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9367476389743388,
+          "perplexity_degradation": 0.017152694976266147,
+          "utility": -0.017152694976266147,
+          "allocation_delta_from_full": {
+            "weight_bits": {
+              "14": 4
+            },
+            "kv_retention": {}
+          }
+        }
+      },
+      "marginal_gain_s_a": 1.128201225798291,
+      "marginal_gain_s_b": 0.9688231937291842,
+      "second_order_difference": 0.15937803206910672,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": false,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t02.kv0p25to0p50.c10.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 2,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 10,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L2 (KV:0.25->0.50) | L10 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 6.987837320551217,
+          "mean_nll": 1.9441711121712968,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9476237031631172,
+          "perplexity_degradation": 0.10783230189694226,
+          "utility": -0.10783230189694226,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25,
+              "10": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.975178262986365,
+          "mean_nll": 1.9423578847982441,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9489123187959194,
+          "perplexity_degradation": 0.09517324433208962,
+          "utility": -0.09517324433208962,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.5,
+              "10": 0.25
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.898836650191763,
+          "mean_nll": 1.9313527959669126,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 1.0045298435725272,
+          "perplexity_degradation": 0.01883163153748768,
+          "utility": -0.01883163153748768,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.880659786957794,
+          "mean_nll": 1.9287145466143327,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9416925539262593,
+          "perplexity_degradation": 0.0006547683035185159,
+          "utility": -0.0006547683035185159,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.012659057564852638,
+      "marginal_gain_s_b": 0.018176863233969165,
+      "second_order_difference": -0.005517805669116527,
+      "classification": "submodular",
+      "strict_supermodular": true,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t06.kv0p25to0p50.c02.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 6,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 2,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L6 (KV:0.25->0.50) | L2 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 6.913910834431381,
+          "mean_nll": 1.9335354450366644,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9486620998941362,
+          "perplexity_degradation": 0.03390581577710616,
+          "utility": -0.03390581577710616,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25,
+              "6": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.899582105558559,
+          "mean_nll": 1.9314608453573126,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9497306267730892,
+          "perplexity_degradation": 0.019577086904283725,
+          "utility": -0.019577086904283725,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25,
+              "6": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.9020189867436965,
+          "mean_nll": 1.9318139755766492,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9419354354031384,
+          "perplexity_degradation": 0.022013968089421354,
+          "utility": -0.022013968089421354,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.88804422353656,
+          "mean_nll": 1.9297871874788841,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9379169032908976,
+          "perplexity_degradation": 0.0080392048822846,
+          "utility": -0.0080392048822846,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.014328728872822438,
+      "marginal_gain_s_b": 0.013974763207136753,
+      "second_order_difference": 0.0003539656656856849,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t06.kv0p25to0p50.c14.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 6,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 14,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L6 (KV:0.25->0.50) | L14 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 6.953026825961229,
+          "mean_nll": 1.9391770792945708,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9489001920446754,
+          "perplexity_degradation": 0.07302180730695351,
+          "utility": -0.07302180730695351,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25,
+              "14": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.944452388707239,
+          "mean_nll": 1.9379431233793245,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9492022744379938,
+          "perplexity_degradation": 0.06444737005296375,
+          "utility": -0.06444737005296375,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.5,
+              "14": 0.25
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.9020189867436965,
+          "mean_nll": 1.9318139755766492,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9419354354031384,
+          "perplexity_degradation": 0.022013968089421354,
+          "utility": -0.022013968089421354,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.88804422353656,
+          "mean_nll": 1.9297871874788841,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9379169032908976,
+          "perplexity_degradation": 0.0080392048822846,
+          "utility": -0.0080392048822846,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.008574437253989764,
+      "marginal_gain_s_b": 0.013974763207136753,
+      "second_order_difference": -0.005400325953146989,
+      "classification": "submodular",
+      "strict_supermodular": true,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t10.kv0p25to0p50.c06.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 10,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 6,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L10 (KV:0.25->0.50) | L6 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 6.993557654415982,
+          "mean_nll": 1.9449893902035233,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9481178061105311,
+          "perplexity_degradation": 0.11355263576170671,
+          "utility": -0.11355263576170671,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25,
+              "10": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.933905583412288,
+          "mean_nll": 1.9364232307023286,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9491697526536882,
+          "perplexity_degradation": 0.053900564758012415,
+          "utility": -0.053900564758012415,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "6": 0.25,
+              "10": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.9689944903203624,
+          "mean_nll": 1.941470951857757,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.986978854984045,
+          "perplexity_degradation": 0.08898947166608728,
+          "utility": -0.08898947166608728,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.911275833158292,
+          "mean_nll": 1.9331542565046973,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9436868680641055,
+          "perplexity_degradation": 0.03127081450401725,
+          "utility": -0.03127081450401725,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.059652071003694296,
+      "marginal_gain_s_b": 0.05771865716207003,
+      "second_order_difference": 0.0019334138416242652,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t14.kv0p25to0p50.c02.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 14,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 2,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L14 (KV:0.25->0.50) | L2 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 6.94677115344044,
+          "mean_nll": 1.9382769693861506,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9487287420779467,
+          "perplexity_degradation": 0.06676613478616478,
+          "utility": -0.06676613478616478,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25,
+              "14": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.888599260184378,
+          "mean_nll": 1.9298677639485844,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9490855517797172,
+          "perplexity_degradation": 0.00859424153010302,
+          "utility": -0.00859424153010302,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "2": 0.25,
+              "14": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.932596302936988,
+          "mean_nll": 1.9362343899276442,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9883873681537807,
+          "perplexity_degradation": 0.052591284282712536,
+          "utility": -0.052591284282712536,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.874444731947088,
+          "mean_nll": 1.927810874028623,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9412465319037437,
+          "perplexity_degradation": -0.00556028670718689,
+          "utility": 0.00556028670718689,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.05817189325606176,
+      "marginal_gain_s_b": 0.058151570989899426,
+      "second_order_difference": 2.032226616233146e-05,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    },
+    {
+      "interaction_id": "kv_to_kv.t14.kv0p25to0p50.c10.kv0p25to1",
+      "modality": "kv_to_kv",
+      "target_layer": 14,
+      "target_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 0.5
+      },
+      "conditioning_layer": 10,
+      "conditioning_upgrade": {
+        "kind": "kv",
+        "from": 0.25,
+        "to": 1
+      },
+      "label": "L14 (KV:0.25->0.50) | L10 (KV:0.25->1)",
+      "states": {
+        "s_a": {
+          "perplexity": 7.0233176784356015,
+          "mean_nll": 1.9492357101614888,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9497425649315119,
+          "perplexity_degradation": 0.14331265978132635,
+          "utility": -0.14331265978132635,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.25,
+              "14": 0.25
+            }
+          }
+        },
+        "s_a_union_j": {
+          "perplexity": 6.960298769959807,
+          "mean_nll": 1.940222400143366,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9507087916135788,
+          "perplexity_degradation": 0.08029375130553174,
+          "utility": -0.08029375130553174,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "10": 0.25,
+              "14": 0.5
+            }
+          }
+        },
+        "s_b": {
+          "perplexity": 6.932596302936988,
+          "mean_nll": 1.9362343899276442,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9883873681537807,
+          "perplexity_degradation": 0.052591284282712536,
+          "utility": -0.052591284282712536,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.25
+            }
+          }
+        },
+        "s_b_union_j": {
+          "perplexity": 6.874444731947088,
+          "mean_nll": 1.927810874028623,
+          "num_sequences": 8,
+          "num_scored_tokens": 4096,
+          "fidelity": "cheap",
+          "subsample": 0,
+          "seconds": 0.9412465319037437,
+          "perplexity_degradation": -0.00556028670718689,
+          "utility": 0.00556028670718689,
+          "allocation_delta_from_full": {
+            "weight_bits": {},
+            "kv_retention": {
+              "14": 0.5
+            }
+          }
+        }
+      },
+      "marginal_gain_s_a": 0.06301890847579461,
+      "marginal_gain_s_b": 0.058151570989899426,
+      "second_order_difference": 0.0048673374858951846,
+      "classification": "submodular",
+      "strict_supermodular": false,
+      "within_epsilon": true,
+      "monotone_s_a": true,
+      "monotone_s_b": true
+    }
+  ],
+  "summary": {
+    "total_interactions": 16,
+    "submodular_pairs": 15,
+    "supermodular_pairs": 4,
+    "significant_supermodular_pairs": 1,
+    "submodular_rate": 0.9375,
+    "supermodular_violation_rate": 0.25,
+    "significant_supermodular_rate": 0.0625,
+    "strict_supermodular_pairs": 4,
+    "strict_supermodular_rate": 0.25,
+    "epsilon_band_pairs": 3,
+    "negative_marginals": 0,
+    "total_marginals": 32,
+    "monotonicity_violation_rate": 0.0,
+    "pairwise_gamma": 0.6135658348479849,
+    "by_modality": {
+      "weight_to_weight": {
+        "total": 6,
+        "submodular": 5,
+        "significant_supermodular": 1,
+        "strict_supermodular": 1,
+        "submodular_rate": 0.8333333333333334,
+        "significant_supermodular_rate": 0.16666666666666666,
+        "strict_supermodular_rate": 0.16666666666666666,
+        "pairwise_gamma": 0.9799711064454589
+      },
+      "kv_to_kv": {
+        "total": 6,
+        "submodular": 6,
+        "significant_supermodular": 0,
+        "strict_supermodular": 2,
+        "submodular_rate": 1.0,
+        "significant_supermodular_rate": 0.0,
+        "strict_supermodular_rate": 0.3333333333333333,
+        "pairwise_gamma": 0.6135658348479849
+      },
+      "kv_given_weight": {
+        "total": 4,
+        "submodular": 4,
+        "significant_supermodular": 0,
+        "strict_supermodular": 1,
+        "submodular_rate": 1.0,
+        "significant_supermodular_rate": 0.0,
+        "strict_supermodular_rate": 0.25,
+        "pairwise_gamma": 0.7042457995558141
+      }
+    },
+    "decision_scope": {
+      "rule": "conservative maximum violation / minimum compliance over overall and W|KV",
+      "submodular_rate": 0.9375,
+      "supermodular_violation_rate": 0.25,
+      "significant_supermodular_rate": 0.0625
+    },
+    "verdict": "NEAR-SUBMODULAR / WEAKLY SUBMODULAR",
+    "action": "Proceed with the method-paper hypothesis, then estimate a formal submodularity ratio before claiming greedy bounds."
+  },
+  "execution": {
+    "matrix_interactions": 16,
+    "unique_allocation_states": 49,
+    "new_model_evaluations": 49,
+    "evaluation_cache_enabled": true,
+    "cache_namespace": "352949cce6d17e06",
+    "setup": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "validation",
+      "evaluation_split": "test",
+      "sequence_length": 2048,
+      "cheap_sequences": 8,
+      "full_sequences": 256,
+      "calibration_seed": 0,
+      "tokenizer_source": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+      "calibration_windows": 123,
+      "evaluation_windows": 140,
+      "policy": "recency_sink",
+      "sink_tokens": 4,
+      "protocol": "prefill_evict_decode",
+      "prefill_tokens": 1536,
+      "protocol_chunk_size": 256,
+      "context_length": 2048,
+      "sink_tokens_declared": 4,
+      "retention_by_layer": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "8": 1.0,
+        "9": 1.0,
+        "10": 1.0,
+        "11": 1.0,
+        "12": 1.0,
+        "13": 1.0,
+        "14": 1.0,
+        "15": 1.0
+      },
+      "group_size": 128,
+      "symmetric": true,
+      "unquantized_bits": 16,
+      "num_expert_modules": 16,
+      "experts_per_bit_width": {
+        "16": 1024
+      },
+      "master_store": "checkpoint",
+      "snapshot_path": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+      "checkpoint_layout": "olmoe_split",
+      "resident_bytes": 0,
+      "batch_size": 4,
+      "device": "cuda:1",
+      "evaluation_count": 49
+    },
+    "shard": 1,
+    "num_shards": 2,
+    "full_matrix_interactions": 32,
+    "full_matrix_order": [
+      "weight_given_kv.t02.w2to4.c02.kv0p25to1",
+      "kv_given_weight.t02.kv0p25to0p50.c02.w2to16",
+      "weight_given_kv.t06.w2to4.c06.kv0p25to1",
+      "kv_given_weight.t06.kv0p25to0p50.c06.w2to16",
+      "weight_given_kv.t10.w2to4.c10.kv0p25to1",
+      "kv_given_weight.t10.kv0p25to0p50.c10.w2to16",
+      "weight_given_kv.t14.w2to4.c14.kv0p25to1",
+      "kv_given_weight.t14.kv0p25to0p50.c14.w2to16",
+      "weight_to_weight.t02.w2to4.c06.w2to16",
+      "weight_to_weight.t02.w2to4.c10.w2to16",
+      "weight_to_weight.t02.w2to4.c14.w2to16",
+      "weight_to_weight.t06.w2to4.c02.w2to16",
+      "weight_to_weight.t06.w2to4.c10.w2to16",
+      "weight_to_weight.t06.w2to4.c14.w2to16",
+      "weight_to_weight.t10.w2to4.c02.w2to16",
+      "weight_to_weight.t10.w2to4.c06.w2to16",
+      "weight_to_weight.t10.w2to4.c14.w2to16",
+      "weight_to_weight.t14.w2to4.c02.w2to16",
+      "weight_to_weight.t14.w2to4.c06.w2to16",
+      "weight_to_weight.t14.w2to4.c10.w2to16",
+      "kv_to_kv.t02.kv0p25to0p50.c06.kv0p25to1",
+      "kv_to_kv.t02.kv0p25to0p50.c10.kv0p25to1",
+      "kv_to_kv.t02.kv0p25to0p50.c14.kv0p25to1",
+      "kv_to_kv.t06.kv0p25to0p50.c02.kv0p25to1",
+      "kv_to_kv.t06.kv0p25to0p50.c10.kv0p25to1",
+      "kv_to_kv.t06.kv0p25to0p50.c14.kv0p25to1",
+      "kv_to_kv.t10.kv0p25to0p50.c02.kv0p25to1",
+      "kv_to_kv.t10.kv0p25to0p50.c06.kv0p25to1",
+      "kv_to_kv.t10.kv0p25to0p50.c14.kv0p25to1",
+      "kv_to_kv.t14.kv0p25to0p50.c02.kv0p25to1",
+      "kv_to_kv.t14.kv0p25to0p50.c06.kv0p25to1",
+      "kv_to_kv.t14.kv0p25to0p50.c10.kv0p25to1"
+    ]
+  },
+  "provenance": {
+    "git_commit": "d756cf5032177535e4441a8a5564b2d9ed14899a-dirty",
+    "environment": {
+      "python": "3.12.3",
+      "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+      "torch": "2.13.0+cu130",
+      "transformers": "5.15.1",
+      "mps_available": false,
+      "cuda_available": true
+    },
+    "config_path": "/workspace/submokv/configs/olmoe.yaml",
+    "effective_config": {
+      "model": {
+        "name": "allenai/OLMoE-1B-7B-0924",
+        "num_hidden_layers": 16,
+        "hidden_size": 2048,
+        "intermediate_size": 1024,
+        "num_attention_heads": 16,
+        "num_key_value_heads": 16,
+        "num_experts": 64,
+        "num_experts_per_tok": 8,
+        "vocab_size": 50304,
+        "max_position_embeddings": 4096,
+        "tie_word_embeddings": false,
+        "attention_bias": false,
+        "has_qk_norm": true,
+        "dtype_bytes": 2
+      },
+      "kv": {
+        "context_length": 2048,
+        "batch_size": 4,
+        "dtype_bytes": 2,
+        "sink_tokens": 4
+      },
+      "quant": {
+        "group_size": 128,
+        "scale_bits": 16,
+        "zero_point_bits": 0,
+        "symmetric": true,
+        "unquantized_bits": 16
+      },
+      "ground_set": {
+        "weight_tiers": [
+          3,
+          4,
+          8,
+          16
+        ],
+        "kv_tiers": [
+          0.25,
+          0.5,
+          0.75,
+          1.0
+        ],
+        "weight_groups_per_layer": 1
+      },
+      "budgets": {
+        "fractions": [
+          0.25,
+          0.35,
+          0.5,
+          0.7
+        ]
+      },
+      "seed": 0,
+      "retention": {
+        "policy": "recency_sink",
+        "sink_tokens": 4
+      },
+      "protocol": {
+        "name": "prefill_evict_decode",
+        "prefill_tokens": 1536,
+        "chunk_size": 256
+      },
+      "calibration": {
+        "dataset": "Salesforce/wikitext",
+        "subset": "wikitext-2-raw-v1",
+        "calibration_split": "validation",
+        "evaluation_split": "test",
+        "sequence_length": 2048,
+        "cheap_sequences": 8,
+        "full_sequences": 256,
+        "seed": 0
+      },
+      "runtime": {
+        "device": null,
+        "dtype": "bfloat16",
+        "attn_implementation": null,
+        "master_store": "checkpoint"
+      },
+      "submodularity": {
+        "test_layers": [
+          2,
+          6,
+          10,
+          14
+        ],
+        "weight_upgrades": [
+          [
+            2,
+            4
+          ]
+        ],
+        "kv_upgrades": [
+          [
+            0.25,
+            0.5
+          ]
+        ],
+        "epsilon_ppl": 0.01
+      }
+    },
+    "model_snapshot": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+    "command": [
+      "scripts/submodularity_diagnostic.py",
+      "--config",
+      "configs/olmoe.yaml",
+      "--device",
+      "cuda:1",
+      "--master-store",
+      "checkpoint",
+      "--local-files-only",
+      "--sequences",
+      "8",
+      "--sequence-length",
+      "2048",
+      "--shard",
+      "1",
+      "--num-shards",
+      "2",
+      "--output",
+      "results/submodularity_20260821T183853Z_s1of2.json"
+    ]
+  }
+}

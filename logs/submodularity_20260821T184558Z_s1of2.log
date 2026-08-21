@@ -1,0 +1,54 @@
+Loading weights:   0%|          | 0/179 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/179 [00:02<01:47,  1.63it/s]Loading weights:   3%|▎         | 5/179 [00:05<03:50,  1.32s/it]Loading weights:   8%|▊         | 15/179 [00:06<00:53,  3.07it/s]Loading weights:   9%|▉         | 16/179 [00:08<01:15,  2.16it/s]Loading weights:  15%|█▍        | 26/179 [00:10<00:53,  2.87it/s]Loading weights:  15%|█▌        | 27/179 [00:11<01:03,  2.40it/s]Loading weights:  21%|██        | 37/179 [00:12<00:33,  4.19it/s]Loading weights:  21%|██        | 38/179 [00:13<00:38,  3.68it/s]Loading weights:  27%|██▋       | 48/179 [00:15<00:32,  4.07it/s]Loading weights:  27%|██▋       | 49/179 [00:17<00:48,  2.66it/s]Loading weights:  33%|███▎      | 59/179 [00:18<00:27,  4.41it/s]Loading weights:  34%|███▎      | 60/179 [00:19<00:30,  3.88it/s]Loading weights:  39%|███▉      | 70/179 [00:19<00:17,  6.15it/s]Loading weights:  40%|███▉      | 71/179 [00:20<00:21,  5.08it/s]Loading weights:  45%|████▌     | 81/179 [00:21<00:15,  6.44it/s]Loading weights:  46%|████▌     | 82/179 [00:26<00:44,  2.20it/s]Loading weights:  51%|█████▏    | 92/179 [00:27<00:22,  3.79it/s]Loading weights:  52%|█████▏    | 93/179 [00:28<00:26,  3.20it/s]Loading weights:  58%|█████▊    | 103/179 [00:29<00:17,  4.36it/s]Loading weights:  58%|█████▊    | 104/179 [00:30<00:19,  3.94it/s]Loading weights:  64%|██████▎   | 114/179 [00:32<00:14,  4.39it/s]Loading weights:  64%|██████▍   | 115/179 [00:34<00:22,  2.82it/s]Loading weights:  70%|██████▉   | 125/179 [00:35<00:13,  4.05it/s]Loading weights:  70%|███████   | 126/179 [00:39<00:23,  2.22it/s]Loading weights:  77%|███████▋  | 137/179 [00:39<00:10,  4.12it/s]Loading weights:  83%|████████▎ | 148/179 [00:39<00:04,  6.55it/s]Loading weights:  89%|████████▉ | 159/179 [00:39<00:02,  9.45it/s]Loading weights:  95%|█████████▍| 170/179 [00:40<00:00, 12.79it/s]Loading weights: 100%|██████████| 179/179 [00:40<00:00,  4.44it/s]
+[  1/16] L2 (KV:0.25->0.50) | L2 (W:2->16)
+[  2/16] L6 (KV:0.25->0.50) | L6 (W:2->16)
+[  3/16] L10 (KV:0.25->0.50) | L10 (W:2->16)
+[  4/16] L14 (KV:0.25->0.50) | L14 (W:2->16)
+[  5/16] L2 (W:2->4) | L10 (W:2->16)
+[  6/16] L6 (W:2->4) | L2 (W:2->16)
+[  7/16] L6 (W:2->4) | L14 (W:2->16)
+[  8/16] L10 (W:2->4) | L6 (W:2->16)
+[  9/16] L14 (W:2->4) | L2 (W:2->16)
+[ 10/16] L14 (W:2->4) | L10 (W:2->16)
+[ 11/16] L2 (KV:0.25->0.50) | L10 (KV:0.25->1)
+[ 12/16] L6 (KV:0.25->0.50) | L2 (KV:0.25->1)
+[ 13/16] L6 (KV:0.25->0.50) | L14 (KV:0.25->1)
+[ 14/16] L10 (KV:0.25->0.50) | L6 (KV:0.25->1)
+[ 15/16] L14 (KV:0.25->0.50) | L2 (KV:0.25->1)
+[ 16/16] L14 (KV:0.25->0.50) | L10 (KV:0.25->1)
+============================================================================================================================
+                                          SUB-MoKV SUBMODULARITY DIAGNOSTIC REPORT                                          
+============================================================================================================================
+                                  PARTIAL SHARD 2/2 — VERDICT IS PRELIMINARY UNTIL MERGED                                   
+Model: allenai/OLMoE-1B-7B-0924 | Sequences: 64 | Length: 2048 | epsilon: 0.01 PPL
+----------------------------------------------------------------------------------------------------------------------------
+Layer Pair / Modality                                       | Delta(j|S_A) | Delta(j|S_B) |   Diff (A-B) | Classification
+----------------------------------------------------------------------------------------------------------------------------
+[KV|W] L2 (KV:0.25->0.50) | L2 (W:2->16)                    |      +0.0191 |      +0.0102 |      +0.0089 | Submodular
+[KV|W] L6 (KV:0.25->0.50) | L6 (W:2->16)                    |      +0.0170 |      +0.0205 |      -0.0035 | Submodular
+[KV|W] L10 (KV:0.25->0.50) | L10 (W:2->16)                  |      +0.0494 |      +0.0345 |      +0.0149 | Submodular
+[KV|W] L14 (KV:0.25->0.50) | L14 (W:2->16)                  |      +0.0495 |      +0.0422 |      +0.0074 | Submodular
+[W|W] L2 (W:2->4) | L10 (W:2->16)                           |      +0.4715 |      +0.3933 |      +0.0782 | Submodular
+[W|W] L6 (W:2->4) | L2 (W:2->16)                            |      +0.5097 |      +0.3887 |      +0.1210 | Submodular
+[W|W] L6 (W:2->4) | L14 (W:2->16)                           |      +0.4606 |      +0.3887 |      +0.0719 | Submodular
+[W|W] L10 (W:2->4) | L6 (W:2->16)                           |      +0.7272 |      +0.6135 |      +0.1137 | Submodular
+[W|W] L14 (W:2->4) | L2 (W:2->16)                           |      +1.0915 |      +1.0412 |      +0.0503 | Submodular
+[W|W] L14 (W:2->4) | L10 (W:2->16)                          |      +1.2468 |      +1.0412 |      +0.2056 | Submodular
+[KV|KV] L2 (KV:0.25->0.50) | L10 (KV:0.25->1)               |      +0.0116 |      +0.0102 |      +0.0013 | Submodular
+[KV|KV] L6 (KV:0.25->0.50) | L2 (KV:0.25->1)                |      +0.0181 |      +0.0205 |      -0.0024 | Submodular
+[KV|KV] L6 (KV:0.25->0.50) | L14 (KV:0.25->1)               |      +0.0190 |      +0.0205 |      -0.0015 | Submodular
+[KV|KV] L10 (KV:0.25->0.50) | L6 (KV:0.25->1)               |      +0.0374 |      +0.0345 |      +0.0029 | Submodular
+[KV|KV] L14 (KV:0.25->0.50) | L2 (KV:0.25->1)               |      +0.0444 |      +0.0422 |      +0.0022 | Submodular
+[KV|KV] L14 (KV:0.25->0.50) | L10 (KV:0.25->1)              |      +0.0468 |      +0.0422 |      +0.0046 | Submodular
+----------------------------------------------------------------------------------------------------------------------------
+SUMMARY:
+- Total Interactions Tested: 16
+- Submodular Pairs: 16 (100.00%)
+- Supermodular Pairs (strict violations): 3 (18.75%)
+- Significant Violations Beyond Epsilon: 0 (0.00%; 3 strict violations fall inside epsilon)
+- Negative Marginal Gains: 0/32
+- Empirical Pairwise Gamma: 0.8309
+
+DECISION VERDICT: NEAR-SUBMODULAR / WEAKLY SUBMODULAR
+-> Action: Proceed with the method-paper hypothesis, then estimate a formal submodularity ratio before claiming greedy bounds.
+============================================================================================================================
+JSON log: /workspace/submokv/results/submodularity_20260821T184558Z_s1of2.json
