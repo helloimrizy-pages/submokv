@@ -34,6 +34,8 @@ from submokv.records import environment, git_commit  # noqa: E402
 from submokv.submodularity import (  # noqa: E402
     KV,
     WEIGHT,
+    EffectFloor,
+    EpsilonBand,
     EpsilonPolicy,
     OutsideGroundSetError,
     TierLadders,
@@ -79,6 +81,52 @@ def _configured_upgrades(config: dict[str, Any], key: str) -> str | None:
             parts.append(f"{pair[0]}:{pair[1]}")
         return ",".join(parts)
     raise ValueError(f"submodularity.{key} must be a transition string or list of pairs")
+
+
+def _load_floor(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return a measured floor payload and the record that carried it."""
+    record = json.loads(path.read_text(encoding="utf-8"))
+    floor = record.get("payload", {}).get("second_order_floor", record)
+    if "by_modality" not in floor or "specs" not in floor:
+        raise ValueError(f"{path} does not look like a second-order floor record")
+    return floor, record
+
+
+def _resolve_tolerances(
+    args: argparse.Namespace, config: dict[str, Any]
+) -> tuple[EpsilonBand, EffectFloor, dict[str, Any]]:
+    """Derive both tolerances from the measured floor, never from a transcription.
+
+    The band and the effect gate come from one record, so the epsilon a cell is
+    compared against and the floor it was measured from cannot drift apart.
+    """
+    settings = config.get("submodularity", {})
+    k = settings.get("epsilon_cell_subsamples")
+    if k is None:
+        raise ValueError(
+            "submodularity.epsilon_cell_subsamples is not set; epsilon is sigma2/sqrt(k) and "
+            "the run must declare the k it was built for"
+        )
+    phi = settings.get("effect_relative_phi")
+    if phi is None:
+        raise ValueError(
+            "submodularity.effect_relative_phi is not set; the effect gate of DECISION.md "
+            "Amendment 2 B needs it and it must not be chosen after a classification exists"
+        )
+    floor, record = _load_floor(args.floor)
+    band = EpsilonBand.from_floor_record(floor, int(k))
+    effect = EffectFloor.from_floor_record(
+        floor, float(phi), float(settings.get("effect_noise_multiple", 3.0))
+    )
+    provenance = {
+        "floor_record": str(args.floor.resolve()),
+        "floor_git_commit": record.get("git_commit"),
+        "floor_created_at": floor.get("created_at"),
+        "floor_calibration": floor.get("calibration"),
+        "epsilon_cell_subsamples": int(k),
+        "effect_relative_phi": float(phi),
+    }
+    return band, effect, provenance
 
 
 def _resolve_epsilon(args: argparse.Namespace, config: dict[str, Any]) -> EpsilonPolicy:
@@ -283,6 +331,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--epsilon", type=float, default=None, help="PPL tolerance")
+    parser.add_argument(
+        "--floor",
+        type=Path,
+        default=None,
+        help=(
+            "a measured second-order floor record; both tolerances are derived from it, "
+            "which is what a classifying run requires"
+        ),
+    )
+    parser.add_argument(
+        "--subsamples",
+        type=str,
+        default=None,
+        help=(
+            "comma-separated calibration subsample indices, one cell per set; the count must "
+            "equal submodularity.epsilon_cell_subsamples"
+        ),
+    )
     parser.add_argument("--subsample", type=int, default=0)
     parser.add_argument("--shard", type=int, default=0, help="zero-based interaction shard")
     parser.add_argument("--num-shards", type=int, default=1)
@@ -415,7 +481,29 @@ def main(argv: Sequence[str] | None = None) -> int:
         shard_interactions = tuple(
             spec for index, spec in enumerate(interactions) if index % args.num_shards == args.shard
         )
-        epsilon = _resolve_epsilon(args, config)
+        if args.subsamples is not None:
+            draws = tuple(int(part) for part in args.subsamples.split(",") if part.strip())
+        else:
+            draws = (int(args.subsample),)
+        band: EpsilonBand | None = None
+        effect: EffectFloor | None = None
+        tolerance_provenance: dict[str, Any] = {}
+        if args.floor is not None:
+            band, effect, tolerance_provenance = _resolve_tolerances(args, config)
+            epsilon = band
+            expected_k = tolerance_provenance["epsilon_cell_subsamples"]
+            # Checked here rather than inside the runner so a config mismatch
+            # costs a second instead of a 13 GiB model load.
+            if len(draws) != expected_k:
+                raise ValueError(
+                    f"the tolerance was built for k={expected_k} subsamples per cell but this "
+                    f"run requests {len(draws)} ({list(draws)}). Epsilon is sigma2/sqrt(k), so "
+                    "the two are not comparable. DECISION.md Amendment 1 requires this to "
+                    "fail rather than classify against the wrong tolerance."
+                )
+        else:
+            epsilon = _resolve_epsilon(args, config)
+            expected_k = None
     except (KeyError, TypeError, ValueError) as error:
         parser.error(str(error))
 
@@ -427,7 +515,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "num_hidden_layers": ground.model.num_hidden_layers,
                     "test_layers": list(layers),
                     "tier_ladders": ladders.describe(),
-                    "epsilon_ppl": epsilon.as_dict(),
+                    "subsamples": list(draws),
+                    "epsilon_ppl": (
+                        band.as_dict() if band is not None else epsilon.as_dict()
+                    ),
+                    "effect_gate": effect.as_dict() if effect is not None else None,
                     "calibration": {
                         "dataset": config["calibration"]["dataset"],
                         "subset": config["calibration"]["subset"],
@@ -465,25 +557,37 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (FileNotFoundError, OSError, RuntimeError, ValueError) as error:
         parser.error(str(error))
 
-    def progress(index: int, total: int, spec: Any) -> None:
+    def progress(index: int, total: int, plan: Any, subsample: int) -> None:
         if not args.quiet:
-            print(f"[{index:>3}/{total}] {spec.label}", file=sys.stderr, flush=True)
+            state = plan.compact_dict()
+            print(
+                f"[state {index:>3}/{total}] subsample {subsample} | "
+                f"w={state['weight_bits']} kv={state['kv_retention']}",
+                file=sys.stderr,
+                flush=True,
+            )
 
-    report = run_submodularity_diagnostic(
-        utility,
-        shard_interactions,
-        epsilon=epsilon,
-        subsample=args.subsample,
-        use_cache=not args.no_eval_cache,
-        allow_outside_ground_set=args.allow_outside_ground_set,
-        progress=progress,
-    )
+    try:
+        report = run_submodularity_diagnostic(
+            utility,
+            shard_interactions,
+            epsilon=epsilon,
+            effect_floor=effect,
+            subsamples=draws,
+            expected_subsamples_per_cell=expected_k,
+            use_cache=not args.no_eval_cache,
+            allow_outside_ground_set=args.allow_outside_ground_set,
+            progress=progress,
+        )
+    except (OutsideGroundSetError, ValueError) as error:
+        parser.error(str(error))
     report["provenance"] = {
         "git_commit": git_commit(REPOSITORY_ROOT),
         "environment": environment(),
         "config_path": str(args.config.resolve()),
         "effective_config": config,
         "model_snapshot": snapshot,
+        "tolerances": tolerance_provenance,
         "command": sys.argv if argv is None else [str(Path(__file__)), *argv],
     }
     report["test_layers"] = list(layers)

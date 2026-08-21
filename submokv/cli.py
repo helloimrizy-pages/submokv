@@ -213,6 +213,8 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
             entry.payload["diagnostic_2"] = diagnostic_2_interaction(utility, args.budget)
         elif args.command == "second-order-floor":
             entry.payload["second_order_floor"] = _second_order_floor(args, utility)
+        elif args.command == "diagnostic-1-per-expert":
+            entry.payload["diagnostic_1_per_expert"] = _per_expert(args, utility)
         entry.payload["setup"] = utility.describe()
         entry.payload["ground_set"] = utility.ground_set.describe()
         entry.payload["evaluation_count"] = utility.evaluation_count
@@ -345,6 +347,80 @@ def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any
     return floor
 
 
+def _per_expert(args: argparse.Namespace, utility: Any) -> dict[str, Any]:
+    """Score a sensitivity-ranked per-expert assignment against random ones."""
+    import sys
+
+    from .perexpert import diagnostic_1_per_expert, measure_expert_sensitivity
+
+    draws = tuple(int(part) for part in args.subsamples.split(",") if part.strip())
+    print("measuring router load and per-tier reconstruction error", file=sys.stderr, flush=True)
+    sensitivity = measure_expert_sensitivity(
+        utility, utility.ground_set.weight_tiers, subsample=draws[0]
+    )
+    load = sensitivity.describe()["router_load"]
+    print(
+        f"router load: min {load['min']:.2e} median {load['median']:.2e} max {load['max']:.2e} "
+        f"(uniform would be {load['uniform_would_be']:.2e}); "
+        f"{load['zero_load_experts']} experts received nothing",
+        file=sys.stderr,
+        flush=True,
+    )
+
+    def progress(label: str, index: int, total: int) -> None:
+        print(f"[{index:>3}/{total}] {label}", file=sys.stderr, flush=True)
+
+    report = diagnostic_1_per_expert(
+        utility,
+        args.budget,
+        sensitivity,
+        num_random=args.samples,
+        seed=int(utility.ground_set.model.num_experts * 0 + args.seed),
+        subsamples=draws,
+        progress=progress,
+    )
+    summary = report["summary"]
+    print()
+    print("=" * 96)
+    print("PER-EXPERT ALLOCATION: SENSITIVITY-RANKED vs RANDOM AT MATCHED BUDGET".center(96))
+    print("=" * 96)
+    print(f"Claim under test: {summary['claim_under_test']}")
+    print(
+        f"budget fraction {report['budget_fraction']} | "
+        f"{report['granularity']['num_weight_units']} weight units, one per expert | "
+        f"subsamples {report['calibration']['subsamples']}"
+    )
+    print("-" * 96)
+    print(f"  sensitivity-ranked PPL   {summary['ranked_perplexity_mean']:.5f}")
+    print(f"  uniform            PPL   {summary['uniform_perplexity_mean']:.5f}")
+    if summary["random_perplexity_mean"] is not None:
+        print(
+            f"  random             PPL   {summary['random_perplexity_mean']:.5f} "
+            f"(best {summary['random_perplexity_best']:.5f}, "
+            f"worst {summary['random_perplexity_worst']:.5f}, "
+            f"sd {summary['random_perplexity_stdev']:.5f})"
+        )
+    print("-" * 96)
+    print(
+        f"  ranked beats random on {summary['ranked_beats_random_count']}"
+        f"/{summary['ranked_beats_random_of']} allocations; beats uniform: "
+        f"{summary['ranked_beats_uniform']}"
+    )
+    if summary["mean_advantage_over_random"] is not None:
+        floor = summary["paired_noise_floor"]
+        units = summary["advantage_in_floor_units"]
+        print(
+            f"  mean paired advantage  {summary['mean_advantage_over_random']:+.5f} PPL "
+            f"(positive = ranked is better)"
+        )
+        print(
+            f"  measured paired floor  {floor:.5f} PPL -> advantage is "
+            + ("n/a" if units is None else f"{units:+.2f} floor units")
+        )
+    print("=" * 96)
+    return report
+
+
 def _merge_shards(args: argparse.Namespace, config: dict[str, Any]) -> None:
     """Combine shard records for one diagnostic into the whole experiment's result."""
     from .diagnostics import merge_diagnostic_0, merge_diagnostic_1
@@ -404,6 +480,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             "second-order-floor",
             "spread of the second-order difference, which is what epsilon is set from",
         ),
+        (
+            "diagnostic-1-per-expert",
+            "sensitivity-ranked per-expert assignment against random at matched budget",
+        ),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("--model-path", type=Path, default=None)
@@ -439,8 +519,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if name == "diagnostic-0":
             sub.add_argument("--expert-layers", type=str, default="0,8")
             sub.add_argument("--expert-sample", type=int, default=8)
-        if name in ("diagnostic-1", "diagnostic-2"):
+        if name in ("diagnostic-1", "diagnostic-2", "diagnostic-1-per-expert"):
             sub.add_argument("--budget", type=float, default=0.35)
+        if name == "diagnostic-1-per-expert":
+            sub.add_argument("--samples", type=int, default=30)
+            sub.add_argument("--seed", type=int, default=0)
+            sub.add_argument(
+                "--subsamples",
+                type=str,
+                default="0,1,2",
+                help="comma-separated calibration draws; every allocation is scored on all of them",
+            )
         if name == "diagnostic-1":
             sub.add_argument("--samples", type=int, default=30)
         if name == "second-order-floor":

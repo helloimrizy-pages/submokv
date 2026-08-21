@@ -1,4 +1,8 @@
-# Sub-MoKV configuration for OLMoE-1B-7B.
+# Sub-MoKV configuration for OLMoE-1B-7B at PER-EXPERT weight granularity.
+#
+# Identical to configs/olmoe.yaml except for ground_set.weight_groups_per_layer.
+# Used only by `diagnostic-1-per-expert`, which tests whether a
+# sensitivity-driven per-expert assignment beats random at matched budget.
 #
 # The model block mirrors the fields of the Hugging Face config at
 # allenai/OLMoE-1B-7B-0924, retrieved 2026-08-19. Byte accounting reads these
@@ -43,9 +47,12 @@ quant:
 ground_set:
   weight_tiers: [3, 4, 8, 16]
   kv_tiers: [0.25, 0.50, 0.75, 1.00]
-  # 1 puts every expert in a layer on a single ladder. Raising this splits a
-  # layer's experts into that many contiguous groups, each with its own ladder.
-  weight_groups_per_layer: 1
+  # One ladder per EXPERT, not per layer. This is the granularity the
+  # per-expert claim in MoPEQ, MxMoE and BT-MoE is about: 16 layers x 64
+  # experts = 1024 weight units. The ground set signature differs from the
+  # per-layer config, so the two share no memoized evaluations, which is
+  # correct because they are different allocations.
+  weight_groups_per_layer: 64
 
 budgets:
   # Fractions of the reference footprint, which is every expert at 16 bits and

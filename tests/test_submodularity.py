@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import statistics
 import subprocess
 import sys
 from copy import deepcopy
@@ -165,14 +166,22 @@ def test_runner_logs_all_four_utilities_and_restores_the_tiny_model(tiny_utility
     assert len(report["interactions"]) == 2
     assert report["execution"]["unique_allocation_states"] >= 4
     for row in report["interactions"]:
-        assert set(row["states"]) == {"s_a", "s_a_union_j", "s_b", "s_b_union_j"}
-        a = row["states"]["s_a"]["utility"]
-        aj = row["states"]["s_a_union_j"]["utility"]
-        b = row["states"]["s_b"]["utility"]
-        bj = row["states"]["s_b_union_j"]["utility"]
-        assert row["marginal_gain_s_a"] == pytest.approx(aj - a)
-        assert row["marginal_gain_s_b"] == pytest.approx(bj - b)
-        assert row["second_order_difference"] == pytest.approx((aj - a) - (bj - b))
+        assert [entry["subsample"] for entry in row["per_subsample"]] == row["subsamples"]
+        for entry in row["per_subsample"]:
+            assert set(entry) >= {"ppl_s_a", "ppl_s_a_union_j", "ppl_s_b", "ppl_s_b_union_j"}
+            assert entry["marginal_gain_s_a"] == pytest.approx(
+                entry["ppl_s_a"] - entry["ppl_s_a_union_j"]
+            )
+            assert entry["marginal_gain_s_b"] == pytest.approx(
+                entry["ppl_s_b"] - entry["ppl_s_b_union_j"]
+            )
+            assert entry["second_order_difference"] == pytest.approx(
+                entry["marginal_gain_s_a"] - entry["marginal_gain_s_b"]
+            )
+        # The cell is the mean over its draws, never a single number.
+        assert row["second_order_difference"] == pytest.approx(
+            statistics.fmean(e["second_order_difference"] for e in row["per_subsample"])
+        )
     assert set(tiny_utility.controller.retention().values()) == {1.0}
     assert {
         bits
@@ -188,9 +197,13 @@ def test_formatted_report_contains_the_verdict_and_units(tiny_utility) -> None:
     )
     rendered = format_diagnostic_report(report)
     assert "SUB-MoKV SUBMODULARITY DIAGNOSTIC REPORT" in rendered
-    assert "Delta(j|S_A)" in rendered
+    assert "mean D" in rendered
     assert "DECISION VERDICT:" in rendered
-    assert "Sequences: 2" in rendered
+    assert "2 sequences" in rendered
+    # The asymmetry between target and conditioning moves must be stated, because
+    # a reader will otherwise assume both sides are adjacent.
+    assert "TARGET moves are ADJACENT" in rendered
+    assert "CONDITIONING moves are LARGE" in rendered
 
 
 def test_standalone_script_dry_run_needs_no_model_or_dataset() -> None:
@@ -215,8 +228,16 @@ def test_standalone_script_dry_run_needs_no_model_or_dataset() -> None:
     assert payload["calibration"]["split"] == "train"
     assert payload["calibration"]["sequence_length"] == 4096
     assert payload["calibration"]["sequences"] == 64
-    assert payload["num_interactions"] == 32
+    # Two adjacent target steps per ladder over four layers.
+    assert payload["num_interactions"] == 64
     assert payload["tier_ladders"]["weight_tiers"] == [3, 4, 8, 16]
+    targets = {f"{r['target_upgrade']['from']}->{r['target_upgrade']['to']}"
+               for r in payload["interactions"]}
+    context = {f"{r['conditioning_upgrade']['from']}->{r['conditioning_upgrade']['to']}"
+               for r in payload["interactions"]}
+    assert targets <= {"3->4", "4->8", "0.25->0.5", "0.5->0.75"}
+    # Conditioning is deliberately NOT adjacent.
+    assert context <= {"3->16", "0.25->1"}
 
     shard = subprocess.run(
         [
@@ -237,7 +258,7 @@ def test_standalone_script_dry_run_needs_no_model_or_dataset() -> None:
     )
     shard_payload = json.loads(shard.stdout)
     assert shard_payload["shard"] == 1
-    assert shard_payload["num_shard_interactions"] == 16
+    assert shard_payload["num_shard_interactions"] == 32
 
 
 def _split_report(report, num_shards: int):
@@ -442,7 +463,7 @@ def test_cells_inside_epsilon_are_not_counted_as_submodular_evidence() -> None:
     summary = summarize_interactions(inside, epsilon=0.01)
     assert summary["submodular_pairs"] == 10
     assert summary["resolved_pairs"] == 0
-    assert summary["verdict"] == "UNRESOLVED / INSIDE THE NOISE FLOOR"
+    assert summary["verdict"] == "UNRESOLVED / BELOW THE DECISION THRESHOLD"
 
 
 def test_a_rendered_report_names_the_test_behind_every_count(tiny_utility) -> None:
@@ -452,7 +473,7 @@ def test_a_rendered_report_names_the_test_behind_every_count(tiny_utility) -> No
     rendered = format_diagnostic_report(report)
     assert "HEADLINE - epsilon test (this is the Classification column):" in rendered
     assert "SECONDARY - strict sign test, epsilon ignored (not the classification):" in rendered
-    assert "RESOLUTION - how many cells had enough signal to classify at all:" in rendered
+    assert "GATE 1, STATISTICAL - can the difference be told from zero:" in rendered
     assert "Classification (epsilon test)" in rendered
     assert "Ground-set ladders: weight [3, 4, 8, 16]" in rendered
 
@@ -820,3 +841,197 @@ def test_a_context_only_comparison_selects_no_verdict() -> None:
     decided = compare_conditioning_floor(baseline, check, binding=True)
     assert decided["floor_stands"] is False
     assert "Amendment 2 C" in format_conditioning_check(decided)
+
+
+REAL_FLOOR = (
+    Path(__file__).resolve().parents[1]
+    / "results"
+    / "second_order_floor__20260821T200032Z__601002ea.json"
+)
+
+
+def _real_floor() -> dict:
+    return json.loads(REAL_FLOOR.read_text(encoding="utf-8"))["payload"]["second_order_floor"]
+
+
+def test_the_band_and_the_effect_gate_come_from_the_measured_floor() -> None:
+    """Both tolerances are derived from one record, so they cannot drift apart."""
+    from submokv.submodularity import EffectFloor, EpsilonBand
+
+    floor = _real_floor()
+    band = EpsilonBand.from_floor_record(floor, subsamples_per_cell=3)
+    # Matches what the floor run itself printed, to the digit.
+    assert band.point.for_modality(WEIGHT_TO_WEIGHT) == pytest.approx(0.0026298, abs=1e-6)
+    assert band.point.for_modality(KV_TO_KV) == pytest.approx(0.0013430, abs=1e-6)
+    # The bounds bracket the point estimate, and all three are sigma2/sqrt(3).
+    for modality in (WEIGHT_TO_WEIGHT, KV_TO_KV, WEIGHT_GIVEN_KV, KV_GIVEN_WEIGHT):
+        assert (
+            band.low.for_modality(modality)
+            < band.point.for_modality(modality)
+            < band.high.for_modality(modality)
+        )
+    assert band.as_dict()["binding_reading"] == "point"
+
+    effect = EffectFloor.from_floor_record(floor, phi=0.10, multiple=3.0)
+    assert effect.for_kind(WEIGHT) == pytest.approx(0.03460, abs=1e-4)
+    assert effect.for_kind(KV) == pytest.approx(0.00781, abs=1e-4)
+    assert effect.phi == 0.10
+
+
+def test_the_effect_gate_reproduces_the_task_b_check_scores() -> None:
+    """The gates must score the two Task B check squares as they were reported."""
+    from submokv.submodularity import EffectFloor
+
+    effect = EffectFloor.from_floor_record(_real_floor(), phi=0.10, multiple=3.0)
+    # check 1: L8|L4 at matrix conditioning. Resolved, but 4.9% of its gain.
+    one = effect.evaluate(WEIGHT, magnitude=0.06176, difference=0.00305)
+    assert one["gate_effect_e1"] is True
+    assert one["gate_effect_e2"] is False
+    assert one["relative_interaction"] == pytest.approx(0.0494, abs=1e-3)
+    assert one["effect_failure_reasons"] == ["effect_e2_interaction_immaterial"]
+    # check 2: L14|L10. Six of six draws negative, and still immaterial at 7.1%.
+    two = effect.evaluate(WEIGHT, magnitude=0.12129, difference=-0.00867)
+    assert two["gate_effect_e1"] is True
+    assert two["gate_effect_e2"] is False
+    assert two["relative_interaction"] == pytest.approx(0.0715, abs=1e-3)
+    # A target that buys nothing fails the other clause, and says so distinctly.
+    dead = effect.evaluate(WEIGHT, magnitude=0.01, difference=0.005)
+    assert dead["gate_effect_e1"] is False
+    assert "effect_e1_target_buys_nothing" in dead["effect_failure_reasons"]
+
+
+def test_a_subsample_count_that_does_not_match_k_fails_loudly(tiny_utility_wide) -> None:
+    """DECISION.md Amendment 1: a mean of k draws is only comparable to sigma2/sqrt(k)."""
+    matrix = build_interaction_matrix((0,), LADDERS)
+    with pytest.raises(ValueError, match="not comparable"):
+        run_submodularity_diagnostic(
+            tiny_utility_wide,
+            matrix,
+            epsilon=0.01,
+            subsamples=(0, 1),
+            expected_subsamples_per_cell=3,
+        )
+
+
+def test_a_cell_is_a_mean_over_its_draws_with_its_spread(tiny_utility_wide) -> None:
+    report = run_submodularity_diagnostic(
+        tiny_utility_wide, build_interaction_matrix((0,), LADDERS), epsilon=0.01,
+        subsamples=(0, 1, 2),
+    )
+    assert report["calibration"]["subsamples"] == [0, 1, 2]
+    assert report["calibration"]["subsamples_per_cell"] == 3
+    for row in report["interactions"]:
+        assert len(row["per_subsample"]) == 3
+        assert "second_order_stdev" in row and "second_order_stderr" in row
+        assert 0 <= row["sign_agreement"] <= 3
+    json.dumps(report)
+
+
+def test_the_branch_turns_on_both_gates_not_on_resolution_alone(tiny_utility_wide) -> None:
+    """A statistically resolved but immaterial cell must not count toward the branch."""
+    from submokv.submodularity import EffectFloor
+
+    # A floor that E1 passes trivially and E2 cannot: phi of 1.0 demands the
+    # interaction be as large as the gain it sits on.
+    strict = EffectFloor.from_first_order_noise({WEIGHT: 0.0, KV: 0.0}, phi=1.0)
+    report = run_submodularity_diagnostic(
+        tiny_utility_wide,
+        build_interaction_matrix((0, 1), LADDERS),
+        epsilon=0.0,
+        effect_floor=strict,
+        subsamples=(0, 1, 2),
+    )
+    gates = report["summary"]["gates"]
+    assert gates["effect_gate_in_force"] is True
+    assert gates["counts_toward_branch"] == 0
+    assert gates["counts_toward_branch_rate"] == 0.0
+    assert report["summary"]["verdict"] == "UNRESOLVED / BELOW THE DECISION THRESHOLD"
+    # Resolution alone would have said otherwise.
+    assert report["summary"]["resolution"]["resolved_pairs"] > 0
+    assert "effect_e2_interaction_immaterial" in gates["failure_reasons"]
+
+
+def test_the_band_reports_three_readings_and_flags_a_flip(tiny_utility_wide) -> None:
+    from submokv.submodularity import EpsilonBand
+
+    band = EpsilonBand.from_floor_record(_real_floor(), subsamples_per_cell=3)
+    report = run_submodularity_diagnostic(
+        tiny_utility_wide,
+        build_interaction_matrix((0, 1), LADDERS),
+        epsilon=band,
+        subsamples=(0, 1, 2),
+    )
+    reported = report["summary"]["band"]
+    assert set(reported["readings"]) == {"point", "sigma2_low", "sigma2_high"}
+    assert reported["binding_reading"] == "point"
+    # A wider epsilon can never resolve more cells than a narrower one.
+    assert (
+        reported["readings"]["sigma2_high"]["resolved_statistical"]
+        <= reported["readings"]["point"]["resolved_statistical"]
+        <= reported["readings"]["sigma2_low"]["resolved_statistical"]
+    )
+    assert isinstance(reported["verdict_stable_across_band"], bool)
+    if not reported["verdict_stable_across_band"]:
+        assert "FLIPS" in reported["note"]
+
+
+def test_the_report_states_the_move_asymmetry_and_the_layer_coverage(tiny_utility_wide) -> None:
+    from submokv.submodularity import EffectFloor
+
+    effect = EffectFloor.from_first_order_noise({WEIGHT: 0.001, KV: 0.001}, phi=0.10)
+    report = run_submodularity_diagnostic(
+        tiny_utility_wide,
+        build_interaction_matrix(
+            (0, 1), LADDERS, weight_conditioning=TierUpgrade(WEIGHT, 3, 16)
+        ),
+        epsilon=0.01,
+        effect_floor=effect,
+        subsamples=(0, 1, 2),
+    )
+    assert report["layer_coverage"]["layers_sampled"] == 2
+    assert report["layer_coverage"]["layers_in_model"] == 3
+    rendered = format_diagnostic_report(report)
+    assert "TARGET moves are ADJACENT" in rendered
+    assert "GATE 2, EFFECT - would an allocator act on it:" in rendered
+    assert "|D|/m distribution vs phi" in rendered
+    assert "Layer coverage: 2 of 3 layers sampled" in rendered
+
+
+def test_shards_merge_with_the_band_and_the_effect_gate_intact(tiny_utility_wide) -> None:
+    """A merged report must be classified against the same two tolerances as its shards."""
+    from submokv.submodularity import EffectFloor, EpsilonBand
+
+    band = EpsilonBand.from_floor_record(_real_floor(), subsamples_per_cell=3)
+    effect = EffectFloor.from_first_order_noise({WEIGHT: 0.001, KV: 0.001}, phi=0.10)
+    full = run_submodularity_diagnostic(
+        tiny_utility_wide,
+        build_interaction_matrix((0, 1), LADDERS),
+        epsilon=band,
+        effect_floor=effect,
+        subsamples=(0, 1, 2),
+    )
+    merged = merge_submodularity_reports(_split_report(full, 2))
+    assert merged["epsilon_band"]["binding_reading"] == "point"
+    assert merged["effect_gate"]["phi"] == 0.10
+    assert merged["summary"]["band"] is not None
+    assert merged["summary"]["gates"]["effect_gate_in_force"] is True
+    # The merged summary reproduces the whole-matrix one exactly.
+    for key in ("branch_rate", "resolved_pairs", "verdict"):
+        assert merged["summary"][key] == full["summary"][key]
+
+
+def test_shards_that_disagree_on_a_tolerance_refuse_to_merge(tiny_utility_wide) -> None:
+    from submokv.submodularity import EffectFloor
+
+    effect = EffectFloor.from_first_order_noise({WEIGHT: 0.001, KV: 0.001}, phi=0.10)
+    full = run_submodularity_diagnostic(
+        tiny_utility_wide,
+        build_interaction_matrix((0,), LADDERS),
+        epsilon=0.01,
+        effect_floor=effect,
+        subsamples=(0, 1, 2),
+    )
+    shards = _split_report(full, 2)
+    shards[1]["effect_gate"] = {**shards[1]["effect_gate"], "phi": 0.25}
+    with pytest.raises(ValueError, match="disagree on effect_gate"):
+        merge_submodularity_reports(shards)

@@ -65,5 +65,11 @@ submodularity:
   # Must name tiers that ground_set.weight_tiers / kv_tiers contain.
   weight_upgrades: [[3, 4]]
   kv_upgrades: [[0.25, 0.50]]
+  weight_conditioning: [[3, 16]]
+  kv_conditioning: [[0.25, 1.00]]
+  # Both tolerances are derived from a measured floor passed as --floor.
+  epsilon_cell_subsamples: 3
+  effect_relative_phi: 0.10
+  effect_noise_multiple: 3.0
   epsilon_ppl: 0.01
-  epsilon_source: "UNMEASURED placeholder, pending Milestone 3b Task B"
+  epsilon_source: "UNMEASURED placeholder; a classifying run must pass --floor"
