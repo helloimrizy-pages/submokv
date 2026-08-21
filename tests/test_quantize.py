@@ -6,7 +6,12 @@ import pytest
 import torch
 
 from submokv.memory import ModelSpec, QuantSpec, expert_bytes, matrix_bytes
-from submokv.quantize import ExpertQuantizer, fake_quantize, find_expert_modules
+from submokv.quantize import (
+    CheckpointMasterStore,
+    ExpertQuantizer,
+    fake_quantize,
+    find_expert_modules,
+)
 
 TINY_QUANT = QuantSpec(group_size=8, scale_bits=16, zero_point_bits=0)
 
@@ -240,3 +245,71 @@ def test_the_two_bit_tier_is_ternary() -> None:
     weight = torch.randn(1, 128)
     levels = torch.unique(fake_quantize(weight, 2, group_size=128))
     assert len(levels) == 3
+
+
+def test_checkpoint_store_detects_and_repacks_legacy_mixtral_weights(tmp_path) -> None:
+    prefix = "model.layers.0.block_sparse_moe.experts.0"
+    tensors = {
+        f"{prefix}.w1.weight": torch.full((2, 3), 1.0),
+        f"{prefix}.w3.weight": torch.full((2, 3), 3.0),
+        f"{prefix}.w2.weight": torch.full((3, 2), 2.0),
+    }
+    index = {"weight_map": {key: "model.safetensors" for key in tensors}}
+    (tmp_path / "model.safetensors.index.json").write_text(__import__("json").dumps(index))
+    store = CheckpointMasterStore(tmp_path)
+    store._tensor = tensors.__getitem__  # type: ignore[method-assign]
+
+    gate_up = store.read(0, "gate_up_proj", [0], torch.device("cpu"), torch.float32)
+    down = store.read(0, "down_proj", [0], torch.device("cpu"), torch.float32)
+    assert store.layout == "mixtral_split"
+    assert gate_up.shape == (1, 4, 3)
+    assert gate_up[0, :2].eq(1.0).all()
+    assert gate_up[0, 2:].eq(3.0).all()
+    assert torch.equal(down, tensors[f"{prefix}.w2.weight"].unsqueeze(0))
+
+
+def test_checkpoint_store_reads_already_packed_expert_weights(tmp_path) -> None:
+    prefix = "model.layers.0.mlp.experts"
+    tensors = {
+        f"{prefix}.gate_up_proj": torch.randn(3, 4, 5),
+        f"{prefix}.down_proj": torch.randn(3, 5, 2),
+    }
+    index = {"weight_map": {key: "model.safetensors" for key in tensors}}
+    (tmp_path / "model.safetensors.index.json").write_text(__import__("json").dumps(index))
+    store = CheckpointMasterStore(tmp_path)
+    store._tensor = tensors.__getitem__  # type: ignore[method-assign]
+
+    actual = store.read(0, "gate_up_proj", [0, 2], torch.device("cpu"), torch.float32)
+    assert store.layout == "packed"
+    assert torch.equal(actual, tensors[f"{prefix}.gate_up_proj"][[0, 2]])
+
+
+def test_transformers_mixtral_experts_are_discovered_and_quantized() -> None:
+    from transformers.models.mixtral.modeling_mixtral import (
+        MixtralConfig,
+        MixtralForCausalLM,
+    )
+
+    config = MixtralConfig(
+        hidden_size=32,
+        intermediate_size=16,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        num_local_experts=4,
+        num_experts_per_tok=2,
+        vocab_size=64,
+        max_position_embeddings=64,
+    )
+    torch.manual_seed(9)
+    model = MixtralForCausalLM(config).eval()
+    modules = find_expert_modules(model)
+    assert [entry.layer for entry in modules] == [0, 1]
+    assert [entry.num_experts for entry in modules] == [4, 4]
+
+    original = modules[1].module.gate_up_proj.detach().clone()
+    quantizer = ExpertQuantizer(model, TINY_QUANT)
+    assert quantizer.set_uniform_bits(2, layers=[1]) == 4
+    assert not torch.equal(original, modules[1].module.gate_up_proj)
+    quantizer.restore()
+    assert torch.equal(original, modules[1].module.gate_up_proj)

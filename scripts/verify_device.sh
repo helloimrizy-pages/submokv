@@ -5,9 +5,11 @@
 # was loaded with, F is bitwise deterministic, and perplexity is in the range a
 # working model gives. Any of them failing invalidates everything downstream.
 set -euo pipefail
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_DIR"
 export PYTHONPATH=.
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export HF_HOME="${HF_HOME:-$REPO_DIR/.hf-cache}"
 
 .venv/bin/python - <<'PY'
 import time, torch

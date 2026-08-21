@@ -99,6 +99,9 @@ class SequenceStore:
     def __init__(self, tokenizer: Any, spec: CalibrationSpec, cache_dir: str | Path = "cache") -> None:
         self.spec = spec
         self.cache_dir = Path(cache_dir)
+        self.tokenizer_source = str(
+            getattr(tokenizer, "name_or_path", tokenizer.__class__.__qualname__)
+        )
         self.calibration = self._windows(tokenizer, spec.calibration_split)
         self.evaluation = self._windows(tokenizer, spec.evaluation_split)
         self.assert_splits_disjoint()
@@ -118,6 +121,7 @@ class SequenceStore:
         store = cls.__new__(cls)
         store.spec = spec
         store.cache_dir = Path("cache")
+        store.tokenizer_source = "pretokenized_windows"
         store.calibration = calibration
         store.evaluation = evaluation
         store.assert_splits_disjoint()
@@ -125,7 +129,14 @@ class SequenceStore:
 
     def _windows(self, tokenizer: Any, split: str) -> torch.Tensor:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        key = f"{self.spec.dataset}/{self.spec.subset}/{split}/{self.spec.sequence_length}"
+        # Token ids are meaningful only for the tokenizer that produced them.
+        # Without this field, two models sharing a dataset and context length
+        # can read each other's cached windows (and may even index outside the
+        # second model's vocabulary).
+        key = (
+            f"{self.spec.dataset}/{self.spec.subset}/{split}/{self.spec.sequence_length}/"
+            f"{self.tokenizer_source}"
+        )
         digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
         path = self.cache_dir / f"windows_{split}_{digest}.pt"
         if path.exists():
@@ -141,7 +152,18 @@ class SequenceStore:
             if count == 0:
                 raise ValueError(f"split {split!r} is shorter than one window of {length} tokens")
             windows = ids[: count * length].reshape(count, length)
-            torch.save(windows, path)
+            # Two GPU workers may prepare the same dataset on a fresh pod.
+            # Publish only a complete file so neither can observe a partially
+            # written torch archive. Both workers produce identical windows,
+            # so the last atomic replacement is harmless.
+            import os
+
+            temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+            try:
+                torch.save(windows, temporary)
+                temporary.replace(path)
+            finally:
+                temporary.unlink(missing_ok=True)
         order = torch.randperm(windows.shape[0], generator=torch.Generator().manual_seed(self.spec.seed))
         return windows[order].contiguous()
 
@@ -187,6 +209,7 @@ class SequenceStore:
         """Return the pool sizes for result records."""
         return {
             **self.spec.describe(),
+            "tokenizer_source": self.tokenizer_source,
             "calibration_windows": int(self.calibration.shape[0]),
             "evaluation_windows": int(self.evaluation.shape[0]),
         }

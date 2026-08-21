@@ -115,3 +115,8 @@ def test_the_shipped_config_pins_no_device() -> None:
 
     config = load_config(Path(__file__).resolve().parents[1] / "configs" / "olmoe.yaml")
     assert config["runtime"]["device"] is None
+
+
+def test_pretokenized_store_records_its_tokenizer_provenance() -> None:
+    store = make_store()
+    assert store.describe()["tokenizer_source"] == "pretokenized_windows"

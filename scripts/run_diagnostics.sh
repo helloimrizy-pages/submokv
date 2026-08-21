@@ -13,9 +13,11 @@ SEQUENCES="${SEQUENCES:-16}"
 BUDGET="${BUDGET:-0.35}"
 SAMPLES="${SAMPLES:-30}"
 STORE="${STORE:-memory}"
-cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_DIR"
 export PYTHONPATH=.
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export HF_HOME="${HF_HOME:-$REPO_DIR/.hf-cache}"
 
 run_sharded () {
     local command="$1"; shift

@@ -26,6 +26,37 @@ def test_find_attention_modules_returns_one_module_per_layer(tiny_model) -> None
     assert [entry.layer for entry in find_attention_modules(tiny_model)] == [0, 1, 2]
 
 
+def test_retention_hooks_run_on_a_tiny_mixtral_model() -> None:
+    from transformers.models.mixtral.modeling_mixtral import (
+        MixtralConfig,
+        MixtralForCausalLM,
+    )
+
+    config = MixtralConfig(
+        hidden_size=32,
+        intermediate_size=16,
+        num_hidden_layers=2,
+        num_attention_heads=4,
+        num_key_value_heads=2,
+        num_local_experts=4,
+        num_experts_per_tok=2,
+        vocab_size=64,
+        max_position_embeddings=64,
+        attn_implementation="sdpa",
+    )
+    torch.manual_seed(12)
+    model = MixtralForCausalLM(config).eval()
+    ids = torch.randint(0, 64, (1, 16), generator=torch.Generator().manual_seed(4))
+    kv = KVSpec(context_length=16, batch_size=1, sink_tokens=2)
+    with torch.no_grad():
+        full = model(input_ids=ids).logits
+    controller = RetentionController(model, RecencySinkPolicy(sink_tokens=2), kv).attach()
+    controller.set_uniform_retention(0.25)
+    retained = forward_with_retention(model, ids, controller)
+    assert retained.shape == full.shape
+    assert not torch.equal(retained, full)
+
+
 def test_recency_mask_keeps_the_sinks_and_the_most_recent_positions() -> None:
     policy = RecencySinkPolicy(sink_tokens=2)
     allowed = policy.allowed(torch.arange(16), key_length=16, budget=4, state=None)

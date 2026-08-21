@@ -181,13 +181,14 @@ class MemoryMasterStore(MasterStore):
 
 
 class CheckpointMasterStore(MasterStore):
-    """Reads unmodified expert weights from the safetensors checkpoint on demand.
+    """Reads unmodified expert weights from an OLMoE or Mixtral checkpoint.
 
     Nothing is held in memory, which matters because the memory store and the
     resident model together do not leave room for a batched KV cache on a 36 GB
-    machine. The checkpoint stores one matrix per expert while transformers
-    packs them, so gate_proj and up_proj are concatenated on read in the order
-    the packed forward pass chunks them apart.
+    machine. Legacy checkpoints store one matrix per expert while transformers
+    5.x packs them. OLMoE calls those matrices gate/up/down_proj; Mixtral calls
+    them w1/w3/w2. The layout is detected from the safetensors index and gate
+    plus up are concatenated in the order the packed forward pass chunks them.
     """
 
     def __init__(
@@ -203,6 +204,35 @@ class CheckpointMasterStore(MasterStore):
             raise FileNotFoundError(f"no checkpoint index at {index_path}")
         self.weight_map: dict[str, str] = json.loads(index_path.read_text())["weight_map"]
         self._handles: dict[str, Any] = {}
+        self.layout, self.module_template = self._detect_layout(module_template)
+
+    def _detect_layout(self, olmoe_template: str) -> tuple[str, str]:
+        """Return the source checkpoint layout and its module template."""
+        olmoe_gate = f"{olmoe_template.format(layer=0, expert=0)}.gate_proj.weight"
+        if olmoe_gate in self.weight_map:
+            return "olmoe_split", olmoe_template
+
+        for template in (
+            "model.layers.{layer}.block_sparse_moe.experts.{expert}",
+            "model.layers.{layer}.mlp.experts.{expert}",
+        ):
+            if f"{template.format(layer=0, expert=0)}.w1.weight" in self.weight_map:
+                return "mixtral_split", template
+
+        for template in (
+            "model.layers.{layer}.mlp.experts",
+            "model.layers.{layer}.block_sparse_moe.experts",
+        ):
+            if f"{template.format(layer=0)}.gate_up_proj" in self.weight_map:
+                return "packed", template
+
+        examples = sorted(
+            key for key in self.weight_map if "layers.0" in key and "expert" in key
+        )[:5]
+        raise ValueError(
+            "cannot identify the expert layout in the checkpoint index; expected OLMoE "
+            f"gate/up/down, Mixtral w1/w3/w2, or packed expert tensors (examples: {examples})"
+        )
 
     def _tensor(self, key: str) -> torch.Tensor:
         from safetensors import safe_open
@@ -225,15 +255,26 @@ class CheckpointMasterStore(MasterStore):
         dtype: torch.dtype,
     ) -> torch.Tensor:
         """Return the unmodified weights of the named experts, stacked on the first dimension."""
+        if self.layout == "packed":
+            prefix = self.module_template.format(layer=layer)
+            if name not in EXPERT_PARAMETER_NAMES:
+                raise KeyError(f"no checkpoint rule for parameter {name!r}")
+            return self._tensor(f"{prefix}.{name}")[list(experts)].to(device, dtype=dtype)
+
         slices: list[torch.Tensor] = []
         for expert in experts:
             prefix = self.module_template.format(layer=layer, expert=expert)
             if name == "gate_up_proj":
-                gate = self._tensor(f"{prefix}.gate_proj.weight")
-                up = self._tensor(f"{prefix}.up_proj.weight")
+                if self.layout == "olmoe_split":
+                    gate = self._tensor(f"{prefix}.gate_proj.weight")
+                    up = self._tensor(f"{prefix}.up_proj.weight")
+                else:
+                    gate = self._tensor(f"{prefix}.w1.weight")
+                    up = self._tensor(f"{prefix}.w3.weight")
                 slices.append(torch.cat([gate, up], dim=0))
             elif name == "down_proj":
-                slices.append(self._tensor(f"{prefix}.down_proj.weight"))
+                suffix = "down_proj.weight" if self.layout == "olmoe_split" else "w2.weight"
+                slices.append(self._tensor(f"{prefix}.{suffix}"))
             else:
                 raise KeyError(f"no checkpoint rule for parameter {name!r}")
         return torch.stack(slices, dim=0).to(device, dtype=dtype)
@@ -247,6 +288,7 @@ class CheckpointMasterStore(MasterStore):
         return {
             "master_store": "checkpoint",
             "snapshot_path": str(self.snapshot_path),
+            "checkpoint_layout": self.layout,
             "resident_bytes": 0,
         }
 

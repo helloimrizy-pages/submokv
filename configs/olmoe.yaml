@@ -96,3 +96,14 @@ runtime:
   # The memory master would cost 12 GiB on top of the resident model, which
   # does not leave room for a batched cache on this machine.
   master_store: checkpoint
+
+submodularity:
+  # OLMoE has 16 layers, so the 32-layer Mixtral grid [2, 10, 18, 26] is not
+  # valid here. These four indices cover early, early-middle, late-middle, and
+  # late OLMoE blocks without silently clipping a requested layer.
+  test_layers: [2, 6, 10, 14]
+  # One transition per resource ladder gives 32 directed/cross interactions.
+  # The script accepts comma-separated alternatives or --all-upgrades.
+  weight_upgrades: [[2, 4]]
+  kv_upgrades: [[0.25, 0.50]]
+  epsilon_ppl: 0.01

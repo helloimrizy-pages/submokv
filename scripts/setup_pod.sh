@@ -11,7 +11,9 @@ set -euo pipefail
 # machine puts the checkout.
 REPO_DIR="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$REPO_DIR"
+export HF_HOME="${HF_HOME:-$REPO_DIR/.hf-cache}"
 echo "== repository: $REPO_DIR =="
+echo "== Hugging Face cache: $HF_HOME =="
 
 # The wheel has to match the driver already on the machine. PyPI serves the
 # newest CUDA build of torch, which on a machine with an older driver fails at
@@ -32,13 +34,15 @@ fi
 echo "== python environment =="
 command -v uv >/dev/null || pip install -q uv
 uv venv --python 3.12 --clear .venv
+TORCH_VERSION="${TORCH_VERSION:-2.13.0}"
 # torch first, from the CUDA index, so the nvidia runtime packages it pulls are
 # the ones the driver supports. Anything installed before it would fix them to
 # the wrong line.
-uv pip install --python .venv/bin/python --index-url "$TORCH_INDEX" torch
+uv pip install --python .venv/bin/python --index-url "$TORCH_INDEX" "torch==$TORCH_VERSION"
 uv pip install --python .venv/bin/python \
-    numpy scipy pandas matplotlib pytest pyyaml tqdm \
-    "transformers==5.15.1" datasets accelerate safetensors
+    numpy scipy pandas matplotlib pytest "pyyaml==6.0.3" tqdm \
+    "transformers==5.15.1" "datasets==5.0.1" \
+    "accelerate==1.14.0" "safetensors==0.8.0"
 
 echo "== versions =="
 .venv/bin/python - <<'PY'
@@ -55,12 +59,33 @@ PY
 
 echo "== unit tests, no accelerator needed =="
 .venv/bin/python -m pytest tests/ -q
+.venv/bin/python scripts/submodularity_diagnostic.py --dry-run >/dev/null
 
 echo "== model =="
 .venv/bin/python - <<'PY'
 from huggingface_hub import snapshot_download
-print("SNAPSHOT:", snapshot_download("allenai/OLMoE-1B-7B-0924",
-      allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"], max_workers=8))
+from transformers import AutoTokenizer
+from submokv.utility import CalibrationSpec, SequenceStore
+
+snapshot = snapshot_download(
+    "allenai/OLMoE-1B-7B-0924",
+    allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],
+    max_workers=8,
+)
+print("SNAPSHOT:", snapshot)
+
+print("== default calibration windows ==")
+tokenizer = AutoTokenizer.from_pretrained(snapshot)
+spec = CalibrationSpec(
+    calibration_split="validation",
+    evaluation_split="test",
+    sequence_length=2048,
+    cheap_sequences=64,
+)
+store = SequenceStore(tokenizer, spec, "cache")
+print(store.describe())
 PY
 
-echo "== done. Next: scripts/verify_device.sh =="
+echo "== done =="
+echo "Next, verify the numerical path:  scripts/verify_device.sh"
+echo "Then run on all GPUs:             GPUS=2 scripts/run_submodularity.sh"
