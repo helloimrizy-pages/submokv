@@ -1057,8 +1057,14 @@ def default_floor_specs(
 def compare_conditioning_floor(
     baseline: Mapping[str, Any],
     check: Mapping[str, Any],
+    *,
+    binding: bool = True,
+    question: str = "conditioning",
 ) -> dict[str, Any]:
-    """Apply DECISION.md Amendment 2 C: does the measured floor survive Task C conditioning?
+    """Compare one square's sigma2 against another square's confidence interval.
+
+    With ``binding`` set this is DECISION.md Amendment 2 C: does the measured
+    floor survive Task C conditioning?
 
     The floor was measured with adjacent conditioning.  The matrix conditions on
     the large bottom-to-top move.  If ``sigma2`` scales with how much the
@@ -1111,36 +1117,71 @@ def compare_conditioning_floor(
 
     stands = all(row["inside_baseline_interval"] for row in rows)
     outside = [row["modality"] for row in rows if not row["inside_baseline_interval"]]
-    return {
-        "rule": (
+    if binding:
+        rule = (
             "DECISION.md Amendment 2 C: a checked sigma2 inside the baseline square's 95% "
             "interval leaves the measured floor standing; outside it, Task B is not finished "
             "and the floor is re-derived at the matrix conditioning before anything is "
             "classified"
-        ),
-        "decided_before_measurement": True,
-        "comparisons": rows,
-        "floor_stands": stands,
-        "modalities_outside_interval": outside,
-        "verdict": (
+        )
+        verdict = (
             "FLOOR STANDS - Task C proceeds on the measured epsilon"
             if stands
             else "FLOOR DOES NOT STAND - re-derive at the matrix conditioning before Task C"
-        ),
+        )
+    else:
+        # No decision rule was fixed in advance for this comparison, so it
+        # cannot select a verdict. It is reported as context and nothing else.
+        rule = (
+            "CONTEXT ONLY. No decision rule was declared in advance for this comparison, so "
+            "it does not select a verdict and no branch turns on it. It is reported so a "
+            "reader can see how far the floor travels."
+        )
+        verdict = (
+            "CONTEXT: consistent with the reference square"
+            if stands
+            else "CONTEXT: outside the reference square's interval - report as a limitation"
+        )
+    return {
+        "question": question,
+        "binding": binding,
+        "rule": rule,
+        "decided_before_measurement": binding,
+        "comparisons": rows,
+        "floor_stands": stands if binding else None,
+        "consistent": stands,
+        "modalities_outside_interval": outside,
+        "verdict": verdict,
     }
 
 
 def format_conditioning_check(comparison: Mapping[str, Any]) -> str:
     """Render the Amendment 2 C conditioning check as a terminal table."""
     width = 104
+    binding = bool(comparison.get("binding", True))
+    title = (
+        "TASK B CONDITIONING CHECK (DECISION.md Amendment 2 C)"
+        if binding
+        else f"TASK B {str(comparison.get('question', '')).upper()} CHECK - CONTEXT ONLY"
+    )
+    preamble = (
+        [
+            "Rule fixed before either number existed:",
+            "  sigma2 at the matrix conditioning INSIDE the adjacent-conditioning 95% interval",
+            "  -> the measured floor stands and Task C proceeds on it.",
+            "  OUTSIDE -> Task B is not finished; re-derive the floor before classifying anything.",
+        ]
+        if binding
+        else [
+            "No decision rule was declared in advance for this comparison.",
+            "  It selects no verdict and no branch turns on it. Reported as context.",
+        ]
+    )
     lines = [
         "=" * width,
-        "TASK B CONDITIONING CHECK (DECISION.md Amendment 2 C)".center(width),
+        title.center(width),
         "=" * width,
-        "Rule fixed before either number existed:",
-        "  sigma2 at the matrix conditioning INSIDE the adjacent-conditioning 95% interval",
-        "  -> the measured floor stands and Task C proceeds on it.",
-        "  OUTSIDE -> Task B is not finished; re-derive the floor before classifying anything.",
+        *preamble,
         "-" * width,
         f"{'modality':<10} {'baseline s2':>12} {'95% interval':>22} {'checked s2':>12} "
         f"{'ratio':>7}  outcome",

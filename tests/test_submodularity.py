@@ -795,3 +795,28 @@ def test_the_conditioning_check_renders_the_rule_and_the_outcome() -> None:
     assert "Amendment 2 C" in rendered
     assert "Rule fixed before either number existed" in rendered
     assert "inside" in rendered
+
+
+def test_a_context_only_comparison_selects_no_verdict() -> None:
+    """A comparison no rule was declared for in advance must not decide anything."""
+    from submokv.submodularity import compare_conditioning_floor, format_conditioning_check
+
+    baseline = _floor_stub(WEIGHT_TO_WEIGHT, 0.00455, 0.00284, 0.01117)
+    check = _floor_stub(WEIGHT_TO_WEIGHT, 0.0150, 0, 1)
+
+    context = compare_conditioning_floor(baseline, check, binding=False, question="layer")
+    assert context["binding"] is False
+    assert context["floor_stands"] is None
+    assert context["consistent"] is False
+    assert context["decided_before_measurement"] is False
+    assert "CONTEXT" in context["verdict"]
+    assert "no branch turns on it" in context["rule"]
+
+    rendered = format_conditioning_check(context)
+    assert "CONTEXT ONLY" in rendered
+    assert "Amendment 2 C" not in rendered
+
+    # The same numbers, declared binding, do decide.
+    decided = compare_conditioning_floor(baseline, check, binding=True)
+    assert decided["floor_stands"] is False
+    assert "Amendment 2 C" in format_conditioning_check(decided)

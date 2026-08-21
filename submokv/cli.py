@@ -170,10 +170,10 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
     }
     name = args.command.replace("-", "_")
     if args.command == "second-order-floor" and getattr(args, "compare_to", None) is not None:
-        # A conditioning check is not a floor: it measures one square and emits
-        # a verdict rather than an epsilon block. Naming it apart keeps the two
-        # out of each other's way in results/.
-        name = "second_order_floor_conditioning_check"
+        # A check is not a floor: it measures one square and compares it rather
+        # than emitting an epsilon block. Naming it apart keeps the two out of
+        # each other's way in results/.
+        name = f"second_order_floor_{args.check_label}_check"
     if num_shards > 1:
         name = f"{name}_s{shard}of{num_shards}"
     with record(name, full_config, seed) as entry:
@@ -285,7 +285,12 @@ def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any
         baseline = baseline_record.get("payload", {}).get(
             "second_order_floor", baseline_record
         )
-        comparison = compare_conditioning_floor(baseline, floor)
+        comparison = compare_conditioning_floor(
+            baseline,
+            floor,
+            binding=args.comparison == "binding",
+            question=args.check_label,
+        )
         comparison["baseline_record"] = str(Path(args.compare_to).resolve())
         comparison["baseline_git_commit"] = baseline_record.get("git_commit")
         floor["conditioning_check"] = comparison
@@ -486,9 +491,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 type=Path,
                 default=None,
                 help=(
-                    "a prior floor record; apply the DECISION.md Amendment 2 C conditioning "
-                    "rule instead of emitting an epsilon block"
+                    "a prior floor record; compare against it instead of emitting an epsilon "
+                    "block"
                 ),
+            )
+            sub.add_argument(
+                "--comparison",
+                choices=("binding", "context"),
+                default="binding",
+                help=(
+                    "binding applies the DECISION.md Amendment 2 C rule and selects a verdict; "
+                    "context reports the comparison without one, for a question no rule was "
+                    "declared for in advance"
+                ),
+            )
+            sub.add_argument(
+                "--check-label",
+                type=str,
+                default="conditioning",
+                help="what this check varies; names the record and the printed table",
             )
             sub.add_argument(
                 "--cell-subsamples",
