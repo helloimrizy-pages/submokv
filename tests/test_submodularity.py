@@ -685,3 +685,113 @@ def test_the_binding_epsilon_is_the_standard_error_of_a_mean_of_k() -> None:
     ratio = single.for_modality(KV_TO_KV) / binding.for_modality(KV_TO_KV)
     assert ratio == pytest.approx(3**0.5)
     assert "sqrt(3)" in binding.source
+
+
+def test_distinct_conditioning_moves_separate_the_two_cross_component_squares() -> None:
+    """With conditioning defaulted to the target move, W|KV and KV|W are one square.
+
+    The mixed second difference is symmetric in its two components, so the same
+    weight move and KV move on one layer give the identical D whichever is
+    called the target. Giving conditioning its own moves separates them.
+    """
+    def corners(spec):
+        p = four_state_plans(spec, 16)
+        return frozenset((p.s_a, p.s_a_union_j, p.s_b, p.s_b_union_j))
+
+    def difference(spec, ppl):
+        p = four_state_plans(spec, 16)
+        return (ppl[p.s_a] - ppl[p.s_a_union_j]) - (ppl[p.s_b] - ppl[p.s_b_union_j])
+
+    cross = {s.modality: s for s in default_floor_specs(LADDERS, 8, 4)}
+    a, b = cross[WEIGHT_GIVEN_KV], cross[KV_GIVEN_WEIGHT]
+    # The same four corners, with S_A+j and S_B swapped between the two specs.
+    assert corners(a) == corners(b)
+    # Which makes D literally the same number, whatever the corners evaluate to.
+    ppl = {plan: 6.0 + 0.37 * index for index, plan in enumerate(sorted(corners(a), key=str))}
+    assert difference(a, ppl) == pytest.approx(difference(b, ppl))
+
+    cross = {
+        s.modality: s
+        for s in default_floor_specs(
+            LADDERS,
+            target_layer=8,
+            conditioning_layer=4,
+            weight_conditioning=TierUpgrade(WEIGHT, 3, 16),
+            kv_conditioning=TierUpgrade(KV, 0.25, 1.0),
+        )
+    }
+    assert corners(cross[WEIGHT_GIVEN_KV]) != corners(cross[KV_GIVEN_WEIGHT])
+
+
+def test_floor_specs_can_be_narrowed_to_one_modality() -> None:
+    specs = default_floor_specs(
+        LADDERS,
+        target_layer=8,
+        conditioning_layer=4,
+        weight_conditioning=TierUpgrade(WEIGHT, 3, 16),
+        modalities=[WEIGHT_TO_WEIGHT],
+    )
+    assert len(specs) == 1
+    assert specs[0].modality == WEIGHT_TO_WEIGHT
+    assert specs[0].target.label == "W:3->4"
+    assert specs[0].conditioning.label == "W:3->16"
+    with pytest.raises(ValueError, match="unknown modality"):
+        default_floor_specs(LADDERS, 8, 4, modalities=["nonsense"])
+
+
+def _floor_stub(modality: str, sigma: float, low: float, high: float) -> dict:
+    return {
+        "by_modality": {
+            modality: {
+                "second_order_stdev_pooled": sigma,
+                "second_order_stdev_pooled_ci": {"confidence": 0.95, "low": low, "high": high},
+                "spec_ids": [f"id.{modality}"],
+            }
+        }
+    }
+
+
+def test_the_conditioning_check_applies_the_amendment_2c_rule() -> None:
+    """Inside the baseline interval the floor stands; outside it Task B is unfinished."""
+    from submokv.submodularity import compare_conditioning_floor
+
+    baseline = _floor_stub(WEIGHT_TO_WEIGHT, 0.00455, 0.00284, 0.01117)
+
+    inside = compare_conditioning_floor(baseline, _floor_stub(WEIGHT_TO_WEIGHT, 0.0060, 0, 1))
+    assert inside["floor_stands"] is True
+    assert inside["comparisons"][0]["inside_baseline_interval"] is True
+    assert inside["comparisons"][0]["ratio_to_baseline"] == pytest.approx(0.0060 / 0.00455)
+    assert "FLOOR STANDS" in inside["verdict"]
+
+    above = compare_conditioning_floor(baseline, _floor_stub(WEIGHT_TO_WEIGHT, 0.0150, 0, 1))
+    assert above["floor_stands"] is False
+    assert above["modalities_outside_interval"] == [WEIGHT_TO_WEIGHT]
+    assert "re-derive" in above["verdict"]
+
+    below = compare_conditioning_floor(baseline, _floor_stub(WEIGHT_TO_WEIGHT, 0.0020, 0, 1))
+    assert below["floor_stands"] is False
+
+    # The interval is closed: a checked value exactly on a bound is inside.
+    for bound in (0.00284, 0.01117):
+        edge = compare_conditioning_floor(baseline, _floor_stub(WEIGHT_TO_WEIGHT, bound, 0, 1))
+        assert edge["floor_stands"] is True
+
+
+def test_the_conditioning_check_refuses_a_modality_the_baseline_never_measured() -> None:
+    from submokv.submodularity import compare_conditioning_floor
+
+    baseline = _floor_stub(WEIGHT_TO_WEIGHT, 0.00455, 0.00284, 0.01117)
+    with pytest.raises(ValueError, match="nothing to compare"):
+        compare_conditioning_floor(baseline, _floor_stub(KV_TO_KV, 0.002, 0, 1))
+
+
+def test_the_conditioning_check_renders_the_rule_and_the_outcome() -> None:
+    from submokv.submodularity import compare_conditioning_floor, format_conditioning_check
+
+    baseline = _floor_stub(WEIGHT_TO_WEIGHT, 0.00455, 0.00284, 0.01117)
+    rendered = format_conditioning_check(
+        compare_conditioning_floor(baseline, _floor_stub(WEIGHT_TO_WEIGHT, 0.0060, 0, 1))
+    )
+    assert "Amendment 2 C" in rendered
+    assert "Rule fixed before either number existed" in rendered
+    assert "inside" in rendered

@@ -1006,13 +1006,26 @@ def default_floor_specs(
     conditioning_layer: int,
     weight_move: TierUpgrade | None = None,
     kv_move: TierUpgrade | None = None,
+    weight_conditioning: TierUpgrade | None = None,
+    kv_conditioning: TierUpgrade | None = None,
+    modalities: Sequence[str] | None = None,
 ) -> tuple[InteractionSpec, ...]:
     """Return one square per modality, on the ground set's bottom adjacent steps.
 
     The floor has to be measured on the same kind of square the run it
-    calibrates will evaluate, so these use adjacent ladder steps rather than
-    bottom-to-top jumps, and every modality gets its own spec because the
-    weight and KV scales differ by roughly a factor of seven.
+    calibrates will evaluate, so the target moves default to adjacent ladder
+    steps rather than bottom-to-top jumps, and every modality gets its own spec
+    because the weight and KV scales differ by roughly a factor of seven.
+
+    The conditioning moves default to the target moves.  They are separable
+    because a matrix may condition on a large move while targeting an adjacent
+    one, and ``sigma2`` plausibly scales with how much the conditioning move
+    perturbs the model.
+
+    Note that with the conditioning moves left at their defaults the two
+    cross-component squares are the *same* square: the mixed second difference
+    is symmetric in its two components, so W|KV and KV|W then yield the
+    identical D.  Giving conditioning its own moves separates them.
     """
     if target_layer == conditioning_layer:
         raise ValueError(
@@ -1021,12 +1034,127 @@ def default_floor_specs(
         )
     weight = weight_move or ladders.adjacent(WEIGHT)[0]
     kv = kv_move or ladders.adjacent(KV)[0]
-    return (
-        InteractionSpec(target_layer, weight, conditioning_layer, weight),
-        InteractionSpec(target_layer, kv, conditioning_layer, kv),
-        InteractionSpec(target_layer, weight, target_layer, kv),
-        InteractionSpec(target_layer, kv, target_layer, weight),
-    )
+    weight_context = weight_conditioning or weight
+    kv_context = kv_conditioning or kv
+    if weight_context.kind != WEIGHT or kv_context.kind != KV:
+        raise ValueError("a conditioning move must be on the ladder it conditions")
+    built = {
+        WEIGHT_TO_WEIGHT: InteractionSpec(target_layer, weight, conditioning_layer, weight_context),
+        KV_TO_KV: InteractionSpec(target_layer, kv, conditioning_layer, kv_context),
+        WEIGHT_GIVEN_KV: InteractionSpec(target_layer, weight, target_layer, kv_context),
+        KV_GIVEN_WEIGHT: InteractionSpec(target_layer, kv, target_layer, weight_context),
+    }
+    if modalities is None:
+        selected = tuple(built)
+    else:
+        selected = tuple(str(name) for name in modalities)
+        unknown = [name for name in selected if name not in built]
+        if unknown:
+            raise ValueError(f"unknown modality/modalities {unknown}; expected {sorted(built)}")
+    return tuple(built[name] for name in selected)
+
+
+def compare_conditioning_floor(
+    baseline: Mapping[str, Any],
+    check: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Apply DECISION.md Amendment 2 C: does the measured floor survive Task C conditioning?
+
+    The floor was measured with adjacent conditioning.  The matrix conditions on
+    the large bottom-to-top move.  If ``sigma2`` scales with how much the
+    conditioning move perturbs the model, a floor measured at the smaller
+    perturbation understates the tolerance the matrix needs.
+
+    The rule was fixed before either number existed: a checked ``sigma2`` inside
+    the baseline square's 95% interval leaves the floor standing, and one
+    outside it means Task B is not finished.
+    """
+    rows: list[dict[str, Any]] = []
+    baseline_by_modality = baseline["by_modality"]
+    for modality, entry in sorted(check["by_modality"].items()):
+        reference = baseline_by_modality.get(modality)
+        if reference is None:
+            raise ValueError(
+                f"the baseline floor measured no {modality!r} square, so there is nothing to "
+                "compare the conditioning check against"
+            )
+        interval = reference["second_order_stdev_pooled_ci"]
+        if interval is None:
+            raise ValueError(
+                f"the baseline {modality!r} square carries no confidence interval; the rule in "
+                "Amendment 2 C is stated against one"
+            )
+        measured = float(entry["second_order_stdev_pooled"])
+        low, high = float(interval["low"]), float(interval["high"])
+        inside = low <= measured <= high
+        rows.append(
+            {
+                "modality": modality,
+                "label": MODALITY_LABELS[modality],
+                "baseline_spec_ids": list(reference["spec_ids"]),
+                "check_spec_ids": list(entry["spec_ids"]),
+                "baseline_sigma2": float(reference["second_order_stdev_pooled"]),
+                "baseline_ci_low": low,
+                "baseline_ci_high": high,
+                "baseline_ci_confidence": float(interval.get("confidence", 0.95)),
+                "check_sigma2": measured,
+                "ratio_to_baseline": (
+                    measured / float(reference["second_order_stdev_pooled"])
+                    if reference["second_order_stdev_pooled"]
+                    else float("nan")
+                ),
+                "inside_baseline_interval": inside,
+            }
+        )
+    if not rows:
+        raise ValueError("the conditioning check measured no squares")
+
+    stands = all(row["inside_baseline_interval"] for row in rows)
+    outside = [row["modality"] for row in rows if not row["inside_baseline_interval"]]
+    return {
+        "rule": (
+            "DECISION.md Amendment 2 C: a checked sigma2 inside the baseline square's 95% "
+            "interval leaves the measured floor standing; outside it, Task B is not finished "
+            "and the floor is re-derived at the matrix conditioning before anything is "
+            "classified"
+        ),
+        "decided_before_measurement": True,
+        "comparisons": rows,
+        "floor_stands": stands,
+        "modalities_outside_interval": outside,
+        "verdict": (
+            "FLOOR STANDS - Task C proceeds on the measured epsilon"
+            if stands
+            else "FLOOR DOES NOT STAND - re-derive at the matrix conditioning before Task C"
+        ),
+    }
+
+
+def format_conditioning_check(comparison: Mapping[str, Any]) -> str:
+    """Render the Amendment 2 C conditioning check as a terminal table."""
+    width = 104
+    lines = [
+        "=" * width,
+        "TASK B CONDITIONING CHECK (DECISION.md Amendment 2 C)".center(width),
+        "=" * width,
+        "Rule fixed before either number existed:",
+        "  sigma2 at the matrix conditioning INSIDE the adjacent-conditioning 95% interval",
+        "  -> the measured floor stands and Task C proceeds on it.",
+        "  OUTSIDE -> Task B is not finished; re-derive the floor before classifying anything.",
+        "-" * width,
+        f"{'modality':<10} {'baseline s2':>12} {'95% interval':>22} {'checked s2':>12} "
+        f"{'ratio':>7}  outcome",
+        "-" * width,
+    ]
+    for row in comparison["comparisons"]:
+        interval = f"[{row['baseline_ci_low']:.5f}, {row['baseline_ci_high']:.5f}]"
+        lines.append(
+            f"{row['label']:<10} {row['baseline_sigma2']:>12.5f} {interval:>22} "
+            f"{row['check_sigma2']:>12.5f} {row['ratio_to_baseline']:>7.2f}x  "
+            + ("inside" if row["inside_baseline_interval"] else "OUTSIDE")
+        )
+    lines.extend(["-" * width, f"VERDICT: {comparison['verdict']}", "=" * width])
+    return "\n".join(lines)
 
 
 def _stdev_confidence_interval(

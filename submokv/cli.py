@@ -169,6 +169,11 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
         "num_shards": num_shards,
     }
     name = args.command.replace("-", "_")
+    if args.command == "second-order-floor" and getattr(args, "compare_to", None) is not None:
+        # A conditioning check is not a floor: it measures one square and emits
+        # a verdict rather than an epsilon block. Naming it apart keeps the two
+        # out of each other's way in results/.
+        name = "second_order_floor_conditioning_check"
     if num_shards > 1:
         name = f"{name}_s{shard}of{num_shards}"
     with record(name, full_config, seed) as entry:
@@ -220,8 +225,10 @@ def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any
     from .submodularity import (
         MODALITY_LABELS,
         TierLadders,
+        compare_conditioning_floor,
         default_floor_specs,
         epsilon_from_floor,
+        format_conditioning_check,
         format_second_order_floor,
         parse_upgrades,
         second_order_noise_floor,
@@ -233,7 +240,29 @@ def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any
     ladders = TierLadders.from_ground_set(utility.ground_set)
     weight_move = parse_upgrades(args.weight_move, WEIGHT_KIND)[0] if args.weight_move else None
     kv_move = parse_upgrades(args.kv_move, KV_KIND)[0] if args.kv_move else None
-    specs = default_floor_specs(ladders, target, conditioning, weight_move, kv_move)
+    weight_context = (
+        parse_upgrades(args.weight_conditioning, WEIGHT_KIND)[0]
+        if args.weight_conditioning
+        else None
+    )
+    kv_context = (
+        parse_upgrades(args.kv_conditioning, KV_KIND)[0] if args.kv_conditioning else None
+    )
+    modalities = (
+        [part.strip() for part in args.modalities.split(",") if part.strip()]
+        if args.modalities
+        else None
+    )
+    specs = default_floor_specs(
+        ladders,
+        target,
+        conditioning,
+        weight_move,
+        kv_move,
+        weight_conditioning=weight_context,
+        kv_conditioning=kv_context,
+        modalities=modalities,
+    )
 
     def progress(index: int, total: int, plan: Any, subsample: int) -> None:
         state = plan.compact_dict()
@@ -249,6 +278,22 @@ def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any
     )
     # The tolerance a run classifies against is recorded next to the floor it
     # came from, in both readings, so the choice is visible rather than implied.
+    if args.compare_to is not None:
+        import json as _json
+
+        baseline_record = _json.loads(Path(args.compare_to).read_text(encoding="utf-8"))
+        baseline = baseline_record.get("payload", {}).get(
+            "second_order_floor", baseline_record
+        )
+        comparison = compare_conditioning_floor(baseline, floor)
+        comparison["baseline_record"] = str(Path(args.compare_to).resolve())
+        comparison["baseline_git_commit"] = baseline_record.get("git_commit")
+        floor["conditioning_check"] = comparison
+        print(format_second_order_floor(floor))
+        print()
+        print(format_conditioning_check(comparison))
+        return floor
+
     single = epsilon_from_floor(floor, subsamples_per_cell=1)
     binding = epsilon_from_floor(floor, subsamples_per_cell=args.cell_subsamples)
     floor["epsilon"] = {
@@ -417,6 +462,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 type=str,
                 default=None,
                 help="FROM:TO retention step to measure the floor on (default: ladder bottom step)",
+            )
+            sub.add_argument(
+                "--weight-conditioning",
+                type=str,
+                default=None,
+                help="FROM:TO weight move to condition on (default: the same as --weight-move)",
+            )
+            sub.add_argument(
+                "--kv-conditioning",
+                type=str,
+                default=None,
+                help="FROM:TO retention move to condition on (default: the same as --kv-move)",
+            )
+            sub.add_argument(
+                "--modalities",
+                type=str,
+                default=None,
+                help="comma-separated modalities to measure (default: all four)",
+            )
+            sub.add_argument(
+                "--compare-to",
+                type=Path,
+                default=None,
+                help=(
+                    "a prior floor record; apply the DECISION.md Amendment 2 C conditioning "
+                    "rule instead of emitting an epsilon block"
+                ),
             )
             sub.add_argument(
                 "--cell-subsamples",
