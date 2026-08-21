@@ -1,0 +1,52 @@
+Loading weights:   0%|          | 0/179 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/179 [00:00<00:07, 23.76it/s]Loading weights:   4%|▍         | 7/179 [00:00<00:19,  8.89it/s]Loading weights:   9%|▉         | 16/179 [00:01<00:13, 12.29it/s]Loading weights:  15%|█▍        | 26/179 [00:01<00:07, 21.45it/s]Loading weights:  17%|█▋        | 30/179 [00:01<00:09, 16.10it/s]Loading weights:  21%|██        | 38/179 [00:02<00:08, 16.08it/s]Loading weights:  27%|██▋       | 48/179 [00:02<00:05, 24.14it/s]Loading weights:  30%|██▉       | 53/179 [00:02<00:06, 18.91it/s]Loading weights:  34%|███▎      | 60/179 [00:03<00:07, 16.71it/s]Loading weights:  39%|███▉      | 70/179 [00:03<00:04, 24.55it/s]Loading weights:  42%|████▏     | 75/179 [00:04<00:05, 19.36it/s]Loading weights:  46%|████▌     | 82/179 [00:04<00:05, 17.35it/s]Loading weights:  52%|█████▏    | 93/179 [00:05<00:04, 18.97it/s]Loading weights:  58%|█████▊    | 104/179 [00:05<00:03, 19.95it/s]Loading weights:  64%|██████▍   | 115/179 [00:06<00:03, 20.64it/s]Loading weights:  70%|███████   | 126/179 [00:06<00:02, 21.10it/s]Loading weights:  77%|███████▋  | 137/179 [00:07<00:01, 21.67it/s]Loading weights:  83%|████████▎ | 148/179 [00:07<00:01, 24.54it/s]Loading weights:  89%|████████▉ | 159/179 [00:07<00:00, 25.93it/s]Loading weights:  95%|█████████▍| 170/179 [00:08<00:00, 28.10it/s]Loading weights: 100%|██████████| 179/179 [00:08<00:00, 22.20it/s]
+[state  1/4] subsample 0 | w={'10': 3, '14': 3} kv={}
+[state  1/4] subsample 1 | w={'10': 3, '14': 3} kv={}
+[state  1/4] subsample 2 | w={'10': 3, '14': 3} kv={}
+[state  1/4] subsample 3 | w={'10': 3, '14': 3} kv={}
+[state  1/4] subsample 4 | w={'10': 3, '14': 3} kv={}
+[state  1/4] subsample 5 | w={'10': 3, '14': 3} kv={}
+[state  2/4] subsample 0 | w={'10': 3, '14': 4} kv={}
+[state  2/4] subsample 1 | w={'10': 3, '14': 4} kv={}
+[state  2/4] subsample 2 | w={'10': 3, '14': 4} kv={}
+[state  2/4] subsample 3 | w={'10': 3, '14': 4} kv={}
+[state  2/4] subsample 4 | w={'10': 3, '14': 4} kv={}
+[state  2/4] subsample 5 | w={'10': 3, '14': 4} kv={}
+[state  3/4] subsample 0 | w={'14': 3} kv={}
+[state  3/4] subsample 1 | w={'14': 3} kv={}
+[state  3/4] subsample 2 | w={'14': 3} kv={}
+[state  3/4] subsample 3 | w={'14': 3} kv={}
+[state  3/4] subsample 4 | w={'14': 3} kv={}
+[state  3/4] subsample 5 | w={'14': 3} kv={}
+[state  4/4] subsample 0 | w={'14': 4} kv={}
+[state  4/4] subsample 1 | w={'14': 4} kv={}
+[state  4/4] subsample 2 | w={'14': 4} kv={}
+[state  4/4] subsample 3 | w={'14': 4} kv={}
+[state  4/4] subsample 4 | w={'14': 4} kv={}
+[state  4/4] subsample 5 | w={'14': 4} kv={}
+==============================================================================================================
+                                      SUB-MoKV SECOND-ORDER NOISE FLOOR                                       
+==============================================================================================================
+Model: allenai/OLMoE-1B-7B-0924 | 64 sequences x 4096 tokens | split: train | subsamples: [0, 1, 2, 3, 4, 5]
+Ladders: weight [3, 4, 8, 16] | kv [0.25, 0.5, 0.75, 1.0]
+--------------------------------------------------------------------------------------------------------------
+Spec                                           |     mean D |    stdev D | stdev m(A) |  stdev PPL
+--------------------------------------------------------------------------------------------------------------
+[W|W] L14 (W:3->4) | L10 (W:3->16)             |    -0.0087 |     0.0033 |     0.0147 |     0.1733
+--------------------------------------------------------------------------------------------------------------
+FLOOR PER MODALITY (this is what epsilon is set from):
+  W|W    sigma2 = 0.0033 PPL from 6 values  95% CI [0.0021, 0.0081]
+         first-order stdev 0.0147 PPL, so the pairing cancels a factor of 4.4
+==============================================================================================================
+
+========================================================================================================
+                                   TASK B LAYER CHECK - CONTEXT ONLY                                    
+========================================================================================================
+No decision rule was declared in advance for this comparison.
+  It selects no verdict and no branch turns on it. Reported as context.
+--------------------------------------------------------------------------------------------------------
+modality    baseline s2           95% interval   checked s2   ratio  outcome
+--------------------------------------------------------------------------------------------------------
+W|W             0.00298     [0.00186, 0.00730]      0.00331    1.11x  inside
+--------------------------------------------------------------------------------------------------------
+VERDICT: CONTEXT: consistent with the reference square
+========================================================================================================

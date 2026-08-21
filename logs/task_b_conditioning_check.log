@@ -1,0 +1,54 @@
+Loading weights:   0%|          | 0/179 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/179 [00:02<01:32,  1.90it/s]Loading weights:   3%|▎         | 5/179 [00:07<05:36,  1.93s/it]Loading weights:   8%|▊         | 15/179 [00:11<01:48,  1.51it/s]Loading weights:   9%|▉         | 16/179 [00:18<03:38,  1.34s/it]Loading weights:  15%|█▍        | 26/179 [00:21<01:53,  1.35it/s]Loading weights:  15%|█▌        | 27/179 [00:28<03:07,  1.23s/it]Loading weights:  21%|██        | 37/179 [00:32<01:47,  1.32it/s]Loading weights:  21%|██        | 38/179 [00:38<02:43,  1.16s/it]Loading weights:  27%|██▋       | 48/179 [00:41<01:36,  1.36it/s]Loading weights:  27%|██▋       | 49/179 [00:48<02:25,  1.12s/it]Loading weights:  33%|███▎      | 59/179 [00:51<01:29,  1.34it/s]Loading weights:  34%|███▎      | 60/179 [00:58<02:15,  1.14s/it]Loading weights:  39%|███▉      | 70/179 [01:01<01:19,  1.38it/s]Loading weights:  40%|███▉      | 71/179 [01:07<01:57,  1.09s/it]Loading weights:  45%|████▌     | 81/179 [01:10<01:08,  1.44it/s]Loading weights:  46%|████▌     | 82/179 [01:16<01:37,  1.01s/it]Loading weights:  51%|█████▏    | 92/179 [01:19<00:58,  1.48it/s]Loading weights:  52%|█████▏    | 93/179 [01:26<01:33,  1.08s/it]Loading weights:  58%|█████▊    | 103/179 [01:29<00:55,  1.36it/s]Loading weights:  58%|█████▊    | 104/179 [01:36<01:23,  1.11s/it]Loading weights:  64%|██████▎   | 114/179 [01:39<00:47,  1.37it/s]Loading weights:  64%|██████▍   | 115/179 [01:46<01:12,  1.14s/it]Loading weights:  70%|██████▉   | 125/179 [01:49<00:40,  1.35it/s]Loading weights:  70%|███████   | 126/179 [01:56<00:59,  1.13s/it]Loading weights:  76%|███████▌  | 136/179 [01:59<00:31,  1.35it/s]Loading weights:  77%|███████▋  | 137/179 [02:06<00:46,  1.11s/it]Loading weights:  82%|████████▏ | 147/179 [02:09<00:23,  1.36it/s]Loading weights:  83%|████████▎ | 148/179 [02:16<00:35,  1.13s/it]Loading weights:  88%|████████▊ | 158/179 [02:19<00:15,  1.38it/s]Loading weights:  89%|████████▉ | 159/179 [02:25<00:22,  1.11s/it]Loading weights:  94%|█████████▍| 169/179 [02:29<00:07,  1.35it/s]Loading weights:  95%|█████████▍| 170/179 [02:35<00:10,  1.11s/it]Loading weights: 100%|██████████| 179/179 [02:35<00:00,  1.15it/s]
+[state  1/4] subsample 0 | w={'4': 3, '8': 3} kv={}
+[state  1/4] subsample 1 | w={'4': 3, '8': 3} kv={}
+[state  1/4] subsample 2 | w={'4': 3, '8': 3} kv={}
+[state  1/4] subsample 3 | w={'4': 3, '8': 3} kv={}
+[state  1/4] subsample 4 | w={'4': 3, '8': 3} kv={}
+[state  1/4] subsample 5 | w={'4': 3, '8': 3} kv={}
+[state  2/4] subsample 0 | w={'4': 3, '8': 4} kv={}
+[state  2/4] subsample 1 | w={'4': 3, '8': 4} kv={}
+[state  2/4] subsample 2 | w={'4': 3, '8': 4} kv={}
+[state  2/4] subsample 3 | w={'4': 3, '8': 4} kv={}
+[state  2/4] subsample 4 | w={'4': 3, '8': 4} kv={}
+[state  2/4] subsample 5 | w={'4': 3, '8': 4} kv={}
+[state  3/4] subsample 0 | w={'8': 3} kv={}
+[state  3/4] subsample 1 | w={'8': 3} kv={}
+[state  3/4] subsample 2 | w={'8': 3} kv={}
+[state  3/4] subsample 3 | w={'8': 3} kv={}
+[state  3/4] subsample 4 | w={'8': 3} kv={}
+[state  3/4] subsample 5 | w={'8': 3} kv={}
+[state  4/4] subsample 0 | w={'8': 4} kv={}
+[state  4/4] subsample 1 | w={'8': 4} kv={}
+[state  4/4] subsample 2 | w={'8': 4} kv={}
+[state  4/4] subsample 3 | w={'8': 4} kv={}
+[state  4/4] subsample 4 | w={'8': 4} kv={}
+[state  4/4] subsample 5 | w={'8': 4} kv={}
+==============================================================================================================
+                                      SUB-MoKV SECOND-ORDER NOISE FLOOR                                       
+==============================================================================================================
+Model: allenai/OLMoE-1B-7B-0924 | 64 sequences x 4096 tokens | split: train | subsamples: [0, 1, 2, 3, 4, 5]
+Ladders: weight [3, 4, 8, 16] | kv [0.25, 0.5, 0.75, 1.0]
+--------------------------------------------------------------------------------------------------------------
+Spec                                           |     mean D |    stdev D | stdev m(A) |  stdev PPL
+--------------------------------------------------------------------------------------------------------------
+[W|W] L8 (W:3->4) | L4 (W:3->16)               |    +0.0030 |     0.0030 |     0.0115 |     0.1730
+--------------------------------------------------------------------------------------------------------------
+FLOOR PER MODALITY (this is what epsilon is set from):
+  W|W    sigma2 = 0.0030 PPL from 6 values  95% CI [0.0019, 0.0073]
+         first-order stdev 0.0115 PPL, so the pairing cancels a factor of 3.9
+==============================================================================================================
+
+========================================================================================================
+                         TASK B CONDITIONING CHECK (DECISION.md Amendment 2 C)                          
+========================================================================================================
+Rule fixed before either number existed:
+  sigma2 at the matrix conditioning INSIDE the adjacent-conditioning 95% interval
+  -> the measured floor stands and Task C proceeds on it.
+  OUTSIDE -> Task B is not finished; re-derive the floor before classifying anything.
+--------------------------------------------------------------------------------------------------------
+modality    baseline s2           95% interval   checked s2   ratio  outcome
+--------------------------------------------------------------------------------------------------------
+W|W             0.00455     [0.00284, 0.01117]      0.00298    0.65x  inside
+--------------------------------------------------------------------------------------------------------
+VERDICT: FLOOR STANDS - Task C proceeds on the measured epsilon
+========================================================================================================
