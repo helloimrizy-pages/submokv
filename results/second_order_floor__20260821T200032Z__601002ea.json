@@ -1,0 +1,847 @@
+{
+  "name": "second_order_floor",
+  "git_commit": "601002eaeefef2dab8e4d605b777dabac375dda8-dirty",
+  "seed": 0,
+  "started_at": "20260821T200032Z",
+  "wall_clock_seconds": 1074.3392896046862,
+  "environment": {
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.15.1",
+    "mps_available": false,
+    "cuda_available": true
+  },
+  "config": {
+    "model": {
+      "name": "allenai/OLMoE-1B-7B-0924",
+      "num_hidden_layers": 16,
+      "hidden_size": 2048,
+      "intermediate_size": 1024,
+      "num_attention_heads": 16,
+      "num_key_value_heads": 16,
+      "num_experts": 64,
+      "num_experts_per_tok": 8,
+      "vocab_size": 50304,
+      "max_position_embeddings": 4096,
+      "tie_word_embeddings": false,
+      "attention_bias": false,
+      "has_qk_norm": true,
+      "dtype_bytes": 2
+    },
+    "kv": {
+      "context_length": 4096,
+      "batch_size": 4,
+      "dtype_bytes": 2,
+      "sink_tokens": 4
+    },
+    "quant": {
+      "group_size": 128,
+      "scale_bits": 16,
+      "zero_point_bits": 0,
+      "symmetric": true,
+      "unquantized_bits": 16
+    },
+    "ground_set": {
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1
+    },
+    "budgets": {
+      "fractions": [
+        0.25,
+        0.35,
+        0.5,
+        0.7
+      ]
+    },
+    "seed": 0,
+    "retention": {
+      "policy": "recency_sink",
+      "sink_tokens": 4
+    },
+    "protocol": {
+      "name": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "chunk_size": 256
+    },
+    "calibration": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 64,
+      "full_sequences": 256,
+      "seed": 0
+    },
+    "runtime": {
+      "device": null,
+      "dtype": "bfloat16",
+      "attn_implementation": null,
+      "master_store": "checkpoint"
+    },
+    "submodularity": {
+      "test_layers": [
+        2,
+        6,
+        10,
+        14
+      ],
+      "weight_upgrades": [
+        [
+          3,
+          4
+        ]
+      ],
+      "kv_upgrades": [
+        [
+          0.25,
+          0.5
+        ]
+      ],
+      "epsilon_ppl": 0.01,
+      "epsilon_source": "UNMEASURED placeholder, pending Milestone 3b Task B"
+    },
+    "model_path": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+    "command": "second-order-floor",
+    "shard": 0,
+    "num_shards": 1
+  },
+  "payload": {
+    "second_order_floor": {
+      "schema_version": 1,
+      "created_at": "2026-08-21T20:18:26Z",
+      "definition": {
+        "second_order_difference": "D = [PPL(S_A) - PPL(S_A+j)] - [PPL(S_B) - PPL(S_B+j)]; identical to [F(S_A+j) - F(S_A)] - [F(S_B+j) - F(S_B)] because the full-precision reference cancels",
+        "floor": "stdev of D over non-overlapping calibration subsamples, per modality",
+        "pairing": "all four corners of one square are read from the same subsample"
+      },
+      "model": {
+        "name": "allenai/OLMoE-1B-7B-0924",
+        "num_hidden_layers": 16
+      },
+      "ground_set_signature": "2eb8f37ec9316e1f",
+      "tier_ladders": {
+        "weight_tiers": [
+          3,
+          4,
+          8,
+          16
+        ],
+        "kv_tiers": [
+          0.25,
+          0.5,
+          0.75,
+          1.0
+        ],
+        "source": "ground_set",
+        "reference_in_ground_set": true
+      },
+      "calibration": {
+        "dataset": "Salesforce/wikitext",
+        "subset": "wikitext-2-raw-v1",
+        "calibration_split": "train",
+        "evaluation_split": "test",
+        "sequence_length": 4096,
+        "cheap_sequences": 64,
+        "full_sequences": 256,
+        "calibration_seed": 0,
+        "fidelity": "cheap",
+        "sequences_per_subsample": 64,
+        "num_subsamples": 6,
+        "subsamples": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "subsamples_available": 9
+      },
+      "specs": [
+        {
+          "interaction_id": "weight_to_weight.t08.w3to4.c04.w3to4",
+          "modality": "weight_to_weight",
+          "target_layer": 8,
+          "target_upgrade": {
+            "kind": "weight",
+            "from": 3,
+            "to": 4,
+            "in_ground_set": true
+          },
+          "conditioning_layer": 4,
+          "conditioning_upgrade": {
+            "kind": "weight",
+            "from": 3,
+            "to": 4,
+            "in_ground_set": true
+          },
+          "label": "L8 (W:3->4) | L4 (W:3->4)",
+          "in_ground_set": true,
+          "subsamples": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "corner_perplexities": [
+            {
+              "subsample": 0,
+              "ppl_s_a": 7.151006500905484,
+              "ppl_s_a_union_j": 7.079028062551149,
+              "ppl_s_b": 7.092118299994551,
+              "ppl_s_b_union_j": 7.027079155087731
+            },
+            {
+              "subsample": 1,
+              "ppl_s_a": 6.856884574243862,
+              "ppl_s_a_union_j": 6.79173088915016,
+              "ppl_s_b": 6.811566497692728,
+              "ppl_s_b_union_j": 6.747512196315005
+            },
+            {
+              "subsample": 2,
+              "ppl_s_a": 7.25155354022956,
+              "ppl_s_a_union_j": 7.206111876642212,
+              "ppl_s_b": 7.208701612580253,
+              "ppl_s_b_union_j": 7.158733023302222
+            },
+            {
+              "subsample": 3,
+              "ppl_s_a": 6.831190064505235,
+              "ppl_s_a_union_j": 6.763257955205828,
+              "ppl_s_b": 6.772731726582755,
+              "ppl_s_b_union_j": 6.710402959522668
+            },
+            {
+              "subsample": 4,
+              "ppl_s_a": 6.886428590148482,
+              "ppl_s_a_union_j": 6.837332601666139,
+              "ppl_s_b": 6.836788288108272,
+              "ppl_s_b_union_j": 6.785395993018013
+            },
+            {
+              "subsample": 5,
+              "ppl_s_a": 6.949729455131558,
+              "ppl_s_a_union_j": 6.878782848003854,
+              "ppl_s_b": 6.893244828143792,
+              "ppl_s_b_union_j": 6.826456880122823
+            }
+          ],
+          "marginal_gain_s_a": [
+            0.0719784383543347,
+            0.06515368509370223,
+            0.045441663587348025,
+            0.06793210929940763,
+            0.049095988482342534,
+            0.07094660712770384
+          ],
+          "marginal_gain_s_b": [
+            0.06503914490682039,
+            0.06405430137772328,
+            0.049968589278030606,
+            0.06232876706008739,
+            0.05139229509025878,
+            0.06678794802096899
+          ],
+          "second_order_differences": [
+            0.006939293447514316,
+            0.0010993837159789521,
+            -0.004526925690682582,
+            0.0056033422393202414,
+            -0.002296306607916243,
+            0.004158659106734852
+          ],
+          "second_order_mean": 0.0018295743684915895,
+          "second_order_stdev": 0.004554917210007824,
+          "second_order_stdev_ci": {
+            "confidence": 0.95,
+            "low": 0.002843215772114042,
+            "high": 0.011171453665944568
+          },
+          "marginal_gain_s_a_stdev": 0.0115333215819421,
+          "marginal_gain_s_b_stdev": 0.007321486916391927,
+          "corner_perplexity_stdev": 0.17297013709370018
+        },
+        {
+          "interaction_id": "kv_to_kv.t08.kv0p25to0p50.c04.kv0p25to0p50",
+          "modality": "kv_to_kv",
+          "target_layer": 8,
+          "target_upgrade": {
+            "kind": "kv",
+            "from": 0.25,
+            "to": 0.5,
+            "in_ground_set": true
+          },
+          "conditioning_layer": 4,
+          "conditioning_upgrade": {
+            "kind": "kv",
+            "from": 0.25,
+            "to": 0.5,
+            "in_ground_set": true
+          },
+          "label": "L8 (KV:0.25->0.50) | L4 (KV:0.25->0.50)",
+          "in_ground_set": true,
+          "subsamples": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "corner_perplexities": [
+            {
+              "subsample": 0,
+              "ppl_s_a": 7.0385124302917665,
+              "ppl_s_a_union_j": 7.029870596216346,
+              "ppl_s_b": 7.015920998774597,
+              "ppl_s_b_union_j": 7.00658645017419
+            },
+            {
+              "subsample": 1,
+              "ppl_s_a": 6.759030077885419,
+              "ppl_s_a_union_j": 6.748271726075152,
+              "ppl_s_b": 6.741507514813631,
+              "ppl_s_b_union_j": 6.729195369659856
+            },
+            {
+              "subsample": 2,
+              "ppl_s_a": 7.177867466008319,
+              "ppl_s_a_union_j": 7.166788661868876,
+              "ppl_s_b": 7.158649708833662,
+              "ppl_s_b_union_j": 7.1475755391733795
+            },
+            {
+              "subsample": 3,
+              "ppl_s_a": 6.718935594865822,
+              "ppl_s_a_union_j": 6.707127286217327,
+              "ppl_s_b": 6.6976971406738,
+              "ppl_s_b_union_j": 6.68748403742843
+            },
+            {
+              "subsample": 4,
+              "ppl_s_a": 6.800584434607768,
+              "ppl_s_a_union_j": 6.787673281851473,
+              "ppl_s_b": 6.785146554750919,
+              "ppl_s_b_union_j": 6.7755296052320215
+            },
+            {
+              "subsample": 5,
+              "ppl_s_a": 6.8407260415065965,
+              "ppl_s_a_union_j": 6.824328696416779,
+              "ppl_s_b": 6.817297788763188,
+              "ppl_s_b_union_j": 6.805250599996598
+            }
+          ],
+          "marginal_gain_s_a": [
+            0.008641834075420185,
+            0.010758351810267186,
+            0.011078804139443399,
+            0.011808308648494581,
+            0.012911152756295508,
+            0.016397345089817605
+          ],
+          "marginal_gain_s_b": [
+            0.009334548600406833,
+            0.012312145153774878,
+            0.011074169660282074,
+            0.010213103245370725,
+            0.009616949518897577,
+            0.012047188766589834
+          ],
+          "second_order_differences": [
+            -0.0006927145249866484,
+            -0.0015537933435076923,
+            4.634479161325089e-06,
+            0.001595205403123856,
+            0.00329420323739793,
+            0.004350156323227772
+          ],
+          "second_order_mean": 0.0011662819290694237,
+          "second_order_stdev": 0.002326077500917247,
+          "second_order_stdev_ci": {
+            "confidence": 0.95,
+            "low": 0.0014519561899471215,
+            "high": 0.005704970217197103
+          },
+          "marginal_gain_s_a_stdev": 0.0026016890321672323,
+          "marginal_gain_s_b_stdev": 0.0012491630984005745,
+          "corner_perplexity_stdev": 0.17986644627014176
+        },
+        {
+          "interaction_id": "weight_given_kv.t08.w3to4.c08.kv0p25to0p50",
+          "modality": "weight_given_kv",
+          "target_layer": 8,
+          "target_upgrade": {
+            "kind": "weight",
+            "from": 3,
+            "to": 4,
+            "in_ground_set": true
+          },
+          "conditioning_layer": 8,
+          "conditioning_upgrade": {
+            "kind": "kv",
+            "from": 0.25,
+            "to": 0.5,
+            "in_ground_set": true
+          },
+          "label": "L8 (W:3->4) | L8 (KV:0.25->0.50)",
+          "in_ground_set": true,
+          "subsamples": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "corner_perplexities": [
+            {
+              "subsample": 0,
+              "ppl_s_a": 7.102584448774195,
+              "ppl_s_a_union_j": 7.030901498626923,
+              "ppl_s_b": 7.089291522223363,
+              "ppl_s_b_union_j": 7.021302720784744
+            },
+            {
+              "subsample": 1,
+              "ppl_s_a": 6.816810002618251,
+              "ppl_s_a_union_j": 6.753972494059382,
+              "ppl_s_b": 6.804231073739569,
+              "ppl_s_b_union_j": 6.741241955058929
+            },
+            {
+              "subsample": 2,
+              "ppl_s_a": 7.213498002701899,
+              "ppl_s_a_union_j": 7.167437899792907,
+              "ppl_s_b": 7.203320345355514,
+              "ppl_s_b_union_j": 7.154556684399568
+            },
+            {
+              "subsample": 3,
+              "ppl_s_a": 6.7800387980168955,
+              "ppl_s_a_union_j": 6.712817725187972,
+              "ppl_s_b": 6.766252657345041,
+              "ppl_s_b_union_j": 6.700046231799016
+            },
+            {
+              "subsample": 4,
+              "ppl_s_a": 6.847775142098723,
+              "ppl_s_a_union_j": 6.80078586194279,
+              "ppl_s_b": 6.837306063523174,
+              "ppl_s_b_union_j": 6.787752468105417
+            },
+            {
+              "subsample": 5,
+              "ppl_s_a": 6.898194096390548,
+              "ppl_s_a_union_j": 6.834036481495375,
+              "ppl_s_b": 6.885481067939163,
+              "ppl_s_b_union_j": 6.81722998147935
+            }
+          ],
+          "marginal_gain_s_a": [
+            0.071682950147272,
+            0.06283750855886883,
+            0.04606010290899132,
+            0.06722107282892331,
+            0.046989280155933066,
+            0.0641576148951728
+          ],
+          "marginal_gain_s_b": [
+            0.0679888014386183,
+            0.0629891186806395,
+            0.048763660955946087,
+            0.0662064255460253,
+            0.04955359541775728,
+            0.0682510864598127
+          ],
+          "second_order_differences": [
+            0.0036941487086536995,
+            -0.00015161012177067335,
+            -0.002703558046954768,
+            0.001014647282898018,
+            -0.0025643152618242127,
+            -0.004093471564639906
+          ],
+          "second_order_mean": -0.0008006931672729737,
+          "second_order_stdev": 0.0028807644977141616,
+          "second_order_stdev_ci": {
+            "confidence": 0.95,
+            "low": 0.0017981962520967581,
+            "high": 0.00706540330480706
+          },
+          "marginal_gain_s_a_stdev": 0.010746047925764078,
+          "marginal_gain_s_b_stdev": 0.009081756401918517,
+          "corner_perplexity_stdev": 0.17446595195660478
+        },
+        {
+          "interaction_id": "kv_given_weight.t08.kv0p25to0p50.c08.w3to4",
+          "modality": "kv_given_weight",
+          "target_layer": 8,
+          "target_upgrade": {
+            "kind": "kv",
+            "from": 0.25,
+            "to": 0.5,
+            "in_ground_set": true
+          },
+          "conditioning_layer": 8,
+          "conditioning_upgrade": {
+            "kind": "weight",
+            "from": 3,
+            "to": 4,
+            "in_ground_set": true
+          },
+          "label": "L8 (KV:0.25->0.50) | L8 (W:3->4)",
+          "in_ground_set": true,
+          "subsamples": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "corner_perplexities": [
+            {
+              "subsample": 0,
+              "ppl_s_a": 7.102584448774195,
+              "ppl_s_a_union_j": 7.089291522223363,
+              "ppl_s_b": 7.030901498626923,
+              "ppl_s_b_union_j": 7.021302720784744
+            },
+            {
+              "subsample": 1,
+              "ppl_s_a": 6.816810002618251,
+              "ppl_s_a_union_j": 6.804231073739569,
+              "ppl_s_b": 6.753972494059382,
+              "ppl_s_b_union_j": 6.741241955058929
+            },
+            {
+              "subsample": 2,
+              "ppl_s_a": 7.213498002701899,
+              "ppl_s_a_union_j": 7.203320345355514,
+              "ppl_s_b": 7.167437899792907,
+              "ppl_s_b_union_j": 7.154556684399568
+            },
+            {
+              "subsample": 3,
+              "ppl_s_a": 6.7800387980168955,
+              "ppl_s_a_union_j": 6.766252657345041,
+              "ppl_s_b": 6.712817725187972,
+              "ppl_s_b_union_j": 6.700046231799016
+            },
+            {
+              "subsample": 4,
+              "ppl_s_a": 6.847775142098723,
+              "ppl_s_a_union_j": 6.837306063523174,
+              "ppl_s_b": 6.80078586194279,
+              "ppl_s_b_union_j": 6.787752468105417
+            },
+            {
+              "subsample": 5,
+              "ppl_s_a": 6.898194096390548,
+              "ppl_s_a_union_j": 6.885481067939163,
+              "ppl_s_b": 6.834036481495375,
+              "ppl_s_b_union_j": 6.81722998147935
+            }
+          ],
+          "marginal_gain_s_a": [
+            0.013292926550832362,
+            0.01257892887868195,
+            0.010177657346384983,
+            0.013786140671854241,
+            0.01046907857554924,
+            0.012713028451385
+          ],
+          "marginal_gain_s_b": [
+            0.009598777842178663,
+            0.012730539000452623,
+            0.012881215393339751,
+            0.012771493388956223,
+            0.013033393837373453,
+            0.016806500016024906
+          ],
+          "second_order_differences": [
+            0.0036941487086536995,
+            -0.00015161012177067335,
+            -0.002703558046954768,
+            0.001014647282898018,
+            -0.0025643152618242127,
+            -0.004093471564639906
+          ],
+          "second_order_mean": -0.0008006931672729737,
+          "second_order_stdev": 0.0028807644977141616,
+          "second_order_stdev_ci": {
+            "confidence": 0.95,
+            "low": 0.0017981962520967581,
+            "high": 0.00706540330480706
+          },
+          "marginal_gain_s_a_stdev": 0.0014964985494330739,
+          "marginal_gain_s_b_stdev": 0.0022887777754167196,
+          "corner_perplexity_stdev": 0.17446595195660478
+        }
+      ],
+      "by_modality": {
+        "weight_to_weight": {
+          "label": "W|W",
+          "num_specs": 1,
+          "num_values": 6,
+          "spec_ids": [
+            "weight_to_weight.t08.w3to4.c04.w3to4"
+          ],
+          "second_order_stdev_pooled": 0.004554917210007824,
+          "second_order_stdev_pooled_ci": {
+            "confidence": 0.95,
+            "low": 0.002843215772114042,
+            "high": 0.011171453665944568
+          },
+          "second_order_stdev_max": 0.004554917210007824,
+          "second_order_mean_abs": 0.0041039851346911975,
+          "first_order_stdev_max": 0.0115333215819421
+        },
+        "kv_to_kv": {
+          "label": "KV|KV",
+          "num_specs": 1,
+          "num_values": 6,
+          "spec_ids": [
+            "kv_to_kv.t08.kv0p25to0p50.c04.kv0p25to0p50"
+          ],
+          "second_order_stdev_pooled": 0.002326077500917247,
+          "second_order_stdev_pooled_ci": {
+            "confidence": 0.95,
+            "low": 0.0014519561899471215,
+            "high": 0.005704970217197103
+          },
+          "second_order_stdev_max": 0.002326077500917247,
+          "second_order_mean_abs": 0.001915117885234204,
+          "first_order_stdev_max": 0.0026016890321672323
+        },
+        "weight_given_kv": {
+          "label": "W|KV",
+          "num_specs": 1,
+          "num_values": 6,
+          "spec_ids": [
+            "weight_given_kv.t08.w3to4.c08.kv0p25to0p50"
+          ],
+          "second_order_stdev_pooled": 0.002880764497714161,
+          "second_order_stdev_pooled_ci": {
+            "confidence": 0.95,
+            "low": 0.001798196252096758,
+            "high": 0.0070654033048070585
+          },
+          "second_order_stdev_max": 0.0028807644977141616,
+          "second_order_mean_abs": 0.0023702918311235464,
+          "first_order_stdev_max": 0.010746047925764078
+        },
+        "kv_given_weight": {
+          "label": "KV|W",
+          "num_specs": 1,
+          "num_values": 6,
+          "spec_ids": [
+            "kv_given_weight.t08.kv0p25to0p50.c08.w3to4"
+          ],
+          "second_order_stdev_pooled": 0.002880764497714161,
+          "second_order_stdev_pooled_ci": {
+            "confidence": 0.95,
+            "low": 0.001798196252096758,
+            "high": 0.0070654033048070585
+          },
+          "second_order_stdev_max": 0.0028807644977141616,
+          "second_order_mean_abs": 0.0023702918311235464,
+          "first_order_stdev_max": 0.0022887777754167196
+        }
+      },
+      "execution": {
+        "unique_allocation_states": 12,
+        "unique_state_subsample_pairs": 72,
+        "new_model_evaluations": 72,
+        "evaluation_cache_enabled": true,
+        "cache_namespace": "3869fc6eb96abc60",
+        "setup": {
+          "dataset": "Salesforce/wikitext",
+          "subset": "wikitext-2-raw-v1",
+          "calibration_split": "train",
+          "evaluation_split": "test",
+          "sequence_length": 4096,
+          "cheap_sequences": 64,
+          "full_sequences": 256,
+          "calibration_seed": 0,
+          "tokenizer_source": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+          "calibration_windows": 593,
+          "evaluation_windows": 70,
+          "policy": "recency_sink",
+          "sink_tokens": 4,
+          "protocol": "prefill_evict_decode",
+          "prefill_tokens": 3072,
+          "protocol_chunk_size": 256,
+          "context_length": 4096,
+          "sink_tokens_declared": 4,
+          "retention_by_layer": {
+            "0": 1.0,
+            "1": 1.0,
+            "2": 1.0,
+            "3": 1.0,
+            "4": 1.0,
+            "5": 1.0,
+            "6": 1.0,
+            "7": 1.0,
+            "8": 1.0,
+            "9": 1.0,
+            "10": 1.0,
+            "11": 1.0,
+            "12": 1.0,
+            "13": 1.0,
+            "14": 1.0,
+            "15": 1.0
+          },
+          "group_size": 128,
+          "symmetric": true,
+          "unquantized_bits": 16,
+          "num_expert_modules": 16,
+          "experts_per_bit_width": {
+            "16": 1024
+          },
+          "master_store": "checkpoint",
+          "snapshot_path": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+          "checkpoint_layout": "olmoe_split",
+          "resident_bytes": 0,
+          "batch_size": 4,
+          "device": "cuda:0",
+          "evaluation_count": 72
+        }
+      },
+      "epsilon": {
+        "binding": "mean_of_k",
+        "rule": "DECISION.md Amendment 1 (2026-08-21): epsilon(modality) = sigma2(modality) / sqrt(k), where k is the number of calibration subsamples averaged into one reported cell by the run being classified",
+        "cell_subsamples": 3,
+        "mean_of_k": {
+          "source": "measured second-order floor (second_order_stdev_pooled, divided by sqrt(3))",
+          "uniform": false,
+          "by_modality": {
+            "kv_given_weight": 0.0016632101582271881,
+            "kv_to_kv": 0.0013429614713105047,
+            "weight_given_kv": 0.0016632101582271881,
+            "weight_to_weight": 0.0026297826773344765
+          }
+        },
+        "single_draw": {
+          "source": "measured second-order floor (second_order_stdev_pooled)",
+          "uniform": false,
+          "by_modality": {
+            "kv_given_weight": 0.002880764497714161,
+            "kv_to_kv": 0.002326077500917247,
+            "weight_given_kv": 0.002880764497714161,
+            "weight_to_weight": 0.004554917210007824
+          },
+          "note": "the raw measured sigma2, kept for reference; superseded as the tolerance by Amendment 1"
+        },
+        "config_yaml": {
+          "epsilon_ppl": {
+            "kv_given_weight": 0.0016632101582271881,
+            "kv_to_kv": 0.0013429614713105047,
+            "weight_given_kv": 0.0016632101582271881,
+            "weight_to_weight": 0.0026297826773344765
+          },
+          "epsilon_source": "measured second-order floor (second_order_stdev_pooled, divided by sqrt(3))",
+          "epsilon_cell_subsamples": 3
+        }
+      }
+    },
+    "setup": {
+      "dataset": "Salesforce/wikitext",
+      "subset": "wikitext-2-raw-v1",
+      "calibration_split": "train",
+      "evaluation_split": "test",
+      "sequence_length": 4096,
+      "cheap_sequences": 64,
+      "full_sequences": 256,
+      "calibration_seed": 0,
+      "tokenizer_source": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+      "calibration_windows": 593,
+      "evaluation_windows": 70,
+      "policy": "recency_sink",
+      "sink_tokens": 4,
+      "protocol": "prefill_evict_decode",
+      "prefill_tokens": 3072,
+      "protocol_chunk_size": 256,
+      "context_length": 4096,
+      "sink_tokens_declared": 4,
+      "retention_by_layer": {
+        "0": 1.0,
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0,
+        "7": 1.0,
+        "8": 1.0,
+        "9": 1.0,
+        "10": 1.0,
+        "11": 1.0,
+        "12": 1.0,
+        "13": 1.0,
+        "14": 1.0,
+        "15": 1.0
+      },
+      "group_size": 128,
+      "symmetric": true,
+      "unquantized_bits": 16,
+      "num_expert_modules": 16,
+      "experts_per_bit_width": {
+        "16": 1024
+      },
+      "master_store": "checkpoint",
+      "snapshot_path": "/workspace/.cache/huggingface/hub/models--allenai--OLMoE-1B-7B-0924/snapshots/6d84c48581ece794365f2b8e9cfb043c68ade9c5",
+      "checkpoint_layout": "olmoe_split",
+      "resident_bytes": 0,
+      "batch_size": 4,
+      "device": "cuda:0",
+      "evaluation_count": 72
+    },
+    "ground_set": {
+      "signature": "2eb8f37ec9316e1f",
+      "model_name": "allenai/OLMoE-1B-7B-0924",
+      "num_units": 32,
+      "num_weight_units": 16,
+      "num_kv_units": 16,
+      "num_increments": 96,
+      "num_weight_increments": 48,
+      "num_kv_increments": 48,
+      "weight_tiers": [
+        3,
+        4,
+        8,
+        16
+      ],
+      "kv_tiers": [
+        0.25,
+        0.5,
+        0.75,
+        1.0
+      ],
+      "weight_groups_per_layer": 1,
+      "context_length": 4096,
+      "batch_size": 4,
+      "quant_group_size": 128,
+      "base_bytes": 4006875136,
+      "reference_bytes": 15985807360
+    },
+    "evaluation_count": 72
+  }
+}

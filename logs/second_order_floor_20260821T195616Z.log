@@ -1,0 +1,108 @@
+Loading weights:   0%|          | 0/179 [00:00<?, ?it/s]Loading weights:   2%|▏         | 4/179 [00:04<03:12,  1.10s/it]Loading weights:   3%|▎         | 5/179 [00:14<09:52,  3.41s/it]Loading weights:   8%|▊         | 15/179 [00:18<02:46,  1.02s/it]Loading weights:   9%|▉         | 16/179 [00:25<04:26,  1.64s/it]Loading weights:  15%|█▍        | 26/179 [00:28<02:13,  1.15it/s]Loading weights:  15%|█▌        | 27/179 [00:35<03:28,  1.37s/it]Loading weights:  21%|██        | 37/179 [00:39<01:56,  1.22it/s]Loading weights:  21%|██        | 38/179 [00:46<02:56,  1.26s/it]Loading weights:  27%|██▋       | 48/179 [00:49<01:42,  1.27it/s]Loading weights:  27%|██▋       | 49/179 [00:55<02:26,  1.13s/it]Loading weights:  33%|███▎      | 59/179 [00:58<01:26,  1.39it/s]Loading weights:  34%|███▎      | 60/179 [01:05<02:16,  1.15s/it]Loading weights:  39%|███▉      | 70/179 [01:09<01:23,  1.30it/s]Loading weights:  40%|███▉      | 71/179 [01:15<02:03,  1.14s/it]Loading weights:  45%|████▌     | 81/179 [01:19<01:14,  1.32it/s]Loading weights:  46%|████▌     | 82/179 [01:25<01:50,  1.14s/it]Loading weights:  51%|█████▏    | 92/179 [01:29<01:05,  1.33it/s]Loading weights:  52%|█████▏    | 93/179 [01:36<01:42,  1.19s/it]Loading weights:  58%|█████▊    | 103/179 [01:39<00:58,  1.29it/s]Loading weights:  58%|█████▊    | 104/179 [01:47<01:28,  1.19s/it]Loading weights:  64%|██████▎   | 114/179 [01:50<00:51,  1.27it/s]Loading weights:  64%|██████▍   | 115/179 [01:57<01:14,  1.17s/it]Loading weights:  70%|██████▉   | 125/179 [02:00<00:42,  1.28it/s]Loading weights:  70%|███████   | 126/179 [02:07<01:01,  1.15s/it]Loading weights:  76%|███████▌  | 136/179 [02:10<00:32,  1.31it/s]Loading weights:  77%|███████▋  | 137/179 [02:18<00:49,  1.18s/it]Loading weights:  82%|████████▏ | 147/179 [02:21<00:25,  1.28it/s]Loading weights:  83%|████████▎ | 148/179 [02:29<00:37,  1.20s/it]Loading weights:  88%|████████▊ | 158/179 [02:32<00:16,  1.30it/s]Loading weights:  89%|████████▉ | 159/179 [02:44<00:29,  1.49s/it]Loading weights:  94%|█████████▍| 169/179 [02:47<00:09,  1.04it/s]Loading weights:  95%|█████████▍| 170/179 [02:55<00:12,  1.37s/it]Loading weights: 100%|██████████| 179/179 [02:55<00:00,  1.02it/s]
+[state  1/12] subsample 0 | w={'4': 3, '8': 3} kv={}
+[state  1/12] subsample 1 | w={'4': 3, '8': 3} kv={}
+[state  1/12] subsample 2 | w={'4': 3, '8': 3} kv={}
+[state  1/12] subsample 3 | w={'4': 3, '8': 3} kv={}
+[state  1/12] subsample 4 | w={'4': 3, '8': 3} kv={}
+[state  1/12] subsample 5 | w={'4': 3, '8': 3} kv={}
+[state  2/12] subsample 0 | w={'4': 3, '8': 4} kv={}
+[state  2/12] subsample 1 | w={'4': 3, '8': 4} kv={}
+[state  2/12] subsample 2 | w={'4': 3, '8': 4} kv={}
+[state  2/12] subsample 3 | w={'4': 3, '8': 4} kv={}
+[state  2/12] subsample 4 | w={'4': 3, '8': 4} kv={}
+[state  2/12] subsample 5 | w={'4': 3, '8': 4} kv={}
+[state  3/12] subsample 0 | w={'4': 4, '8': 3} kv={}
+[state  3/12] subsample 1 | w={'4': 4, '8': 3} kv={}
+[state  3/12] subsample 2 | w={'4': 4, '8': 3} kv={}
+[state  3/12] subsample 3 | w={'4': 4, '8': 3} kv={}
+[state  3/12] subsample 4 | w={'4': 4, '8': 3} kv={}
+[state  3/12] subsample 5 | w={'4': 4, '8': 3} kv={}
+[state  4/12] subsample 0 | w={'4': 4, '8': 4} kv={}
+[state  4/12] subsample 1 | w={'4': 4, '8': 4} kv={}
+[state  4/12] subsample 2 | w={'4': 4, '8': 4} kv={}
+[state  4/12] subsample 3 | w={'4': 4, '8': 4} kv={}
+[state  4/12] subsample 4 | w={'4': 4, '8': 4} kv={}
+[state  4/12] subsample 5 | w={'4': 4, '8': 4} kv={}
+[state  5/12] subsample 0 | w={} kv={'4': 0.25, '8': 0.25}
+[state  5/12] subsample 1 | w={} kv={'4': 0.25, '8': 0.25}
+[state  5/12] subsample 2 | w={} kv={'4': 0.25, '8': 0.25}
+[state  5/12] subsample 3 | w={} kv={'4': 0.25, '8': 0.25}
+[state  5/12] subsample 4 | w={} kv={'4': 0.25, '8': 0.25}
+[state  5/12] subsample 5 | w={} kv={'4': 0.25, '8': 0.25}
+[state  6/12] subsample 0 | w={} kv={'4': 0.25, '8': 0.5}
+[state  6/12] subsample 1 | w={} kv={'4': 0.25, '8': 0.5}
+[state  6/12] subsample 2 | w={} kv={'4': 0.25, '8': 0.5}
+[state  6/12] subsample 3 | w={} kv={'4': 0.25, '8': 0.5}
+[state  6/12] subsample 4 | w={} kv={'4': 0.25, '8': 0.5}
+[state  6/12] subsample 5 | w={} kv={'4': 0.25, '8': 0.5}
+[state  7/12] subsample 0 | w={} kv={'4': 0.5, '8': 0.25}
+[state  7/12] subsample 1 | w={} kv={'4': 0.5, '8': 0.25}
+[state  7/12] subsample 2 | w={} kv={'4': 0.5, '8': 0.25}
+[state  7/12] subsample 3 | w={} kv={'4': 0.5, '8': 0.25}
+[state  7/12] subsample 4 | w={} kv={'4': 0.5, '8': 0.25}
+[state  7/12] subsample 5 | w={} kv={'4': 0.5, '8': 0.25}
+[state  8/12] subsample 0 | w={} kv={'4': 0.5, '8': 0.5}
+[state  8/12] subsample 1 | w={} kv={'4': 0.5, '8': 0.5}
+[state  8/12] subsample 2 | w={} kv={'4': 0.5, '8': 0.5}
+[state  8/12] subsample 3 | w={} kv={'4': 0.5, '8': 0.5}
+[state  8/12] subsample 4 | w={} kv={'4': 0.5, '8': 0.5}
+[state  8/12] subsample 5 | w={} kv={'4': 0.5, '8': 0.5}
+[state  9/12] subsample 0 | w={'8': 3} kv={'8': 0.25}
+[state  9/12] subsample 1 | w={'8': 3} kv={'8': 0.25}
+[state  9/12] subsample 2 | w={'8': 3} kv={'8': 0.25}
+[state  9/12] subsample 3 | w={'8': 3} kv={'8': 0.25}
+[state  9/12] subsample 4 | w={'8': 3} kv={'8': 0.25}
+[state  9/12] subsample 5 | w={'8': 3} kv={'8': 0.25}
+[state 10/12] subsample 0 | w={'8': 4} kv={'8': 0.25}
+[state 10/12] subsample 1 | w={'8': 4} kv={'8': 0.25}
+[state 10/12] subsample 2 | w={'8': 4} kv={'8': 0.25}
+[state 10/12] subsample 3 | w={'8': 4} kv={'8': 0.25}
+[state 10/12] subsample 4 | w={'8': 4} kv={'8': 0.25}
+[state 10/12] subsample 5 | w={'8': 4} kv={'8': 0.25}
+[state 11/12] subsample 0 | w={'8': 3} kv={'8': 0.5}
+[state 11/12] subsample 1 | w={'8': 3} kv={'8': 0.5}
+[state 11/12] subsample 2 | w={'8': 3} kv={'8': 0.5}
+[state 11/12] subsample 3 | w={'8': 3} kv={'8': 0.5}
+[state 11/12] subsample 4 | w={'8': 3} kv={'8': 0.5}
+[state 11/12] subsample 5 | w={'8': 3} kv={'8': 0.5}
+[state 12/12] subsample 0 | w={'8': 4} kv={'8': 0.5}
+[state 12/12] subsample 1 | w={'8': 4} kv={'8': 0.5}
+[state 12/12] subsample 2 | w={'8': 4} kv={'8': 0.5}
+[state 12/12] subsample 3 | w={'8': 4} kv={'8': 0.5}
+[state 12/12] subsample 4 | w={'8': 4} kv={'8': 0.5}
+[state 12/12] subsample 5 | w={'8': 4} kv={'8': 0.5}
+==============================================================================================================
+                                      SUB-MoKV SECOND-ORDER NOISE FLOOR                                       
+==============================================================================================================
+Model: allenai/OLMoE-1B-7B-0924 | 64 sequences x 4096 tokens | split: train | subsamples: [0, 1, 2, 3, 4, 5]
+Ladders: weight [3, 4, 8, 16] | kv [0.25, 0.5, 0.75, 1.0]
+--------------------------------------------------------------------------------------------------------------
+Spec                                           |     mean D |    stdev D | stdev m(A) |  stdev PPL
+--------------------------------------------------------------------------------------------------------------
+[W|W] L8 (W:3->4) | L4 (W:3->4)                |    +0.0018 |     0.0046 |     0.0115 |     0.1730
+[KV|KV] L8 (KV:0.25->0.50) | L4 (KV:0.25->0.50) |    +0.0012 |     0.0023 |     0.0026 |     0.1799
+[W|KV] L8 (W:3->4) | L8 (KV:0.25->0.50)        |    -0.0008 |     0.0029 |     0.0107 |     0.1745
+[KV|W] L8 (KV:0.25->0.50) | L8 (W:3->4)        |    -0.0008 |     0.0029 |     0.0015 |     0.1745
+--------------------------------------------------------------------------------------------------------------
+FLOOR PER MODALITY (this is what epsilon is set from):
+  KV|W   sigma2 = 0.0029 PPL from 6 values  95% CI [0.0018, 0.0071]
+         first-order stdev 0.0023 PPL, so the pairing cancels a factor of 0.8
+  KV|KV  sigma2 = 0.0023 PPL from 6 values  95% CI [0.0015, 0.0057]
+         first-order stdev 0.0026 PPL, so the pairing cancels a factor of 1.1
+  W|KV   sigma2 = 0.0029 PPL from 6 values  95% CI [0.0018, 0.0071]
+         first-order stdev 0.0107 PPL, so the pairing cancels a factor of 3.7
+  W|W    sigma2 = 0.0046 PPL from 6 values  95% CI [0.0028, 0.0112]
+         first-order stdev 0.0115 PPL, so the pairing cancels a factor of 2.5
+==============================================================================================================
+
+Binding tolerance (DECISION.md Amendment 1): sigma2 / sqrt(3)
+Paste into configs/*.yaml under submodularity:
+  epsilon_ppl:
+    kv_given_weight: 0.001663   # KV|W, sigma2 0.002881
+    kv_to_kv: 0.001343   # KV|KV, sigma2 0.002326
+    weight_given_kv: 0.001663   # W|KV, sigma2 0.002881
+    weight_to_weight: 0.002630   # W|W, sigma2 0.004555
+  epsilon_source: "measured second-order floor (second_order_stdev_pooled, divided by sqrt(3))"
+  epsilon_cell_subsamples: 3
+
+The matrix run MUST then use exactly 3 subsamples per cell; a different count invalidates this tolerance.
