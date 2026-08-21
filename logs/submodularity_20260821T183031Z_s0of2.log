@@ -1,0 +1,7 @@
+usage: submodularity_diagnostic.py [-h] [--config CONFIG] [--model-path MODEL_PATH] [--device DEVICE] [--dtype {float16,bfloat16,float32}] [--master-store {checkpoint,memory}]
+                                   [--local-files-only] [--sequences SEQUENCES] [--sequence-length {2048,4096}] [--calibration-split CALIBRATION_SPLIT] [--batch-size BATCH_SIZE]
+                                   [--prefill-tokens PREFILL_TOKENS] [--chunk-size CHUNK_SIZE] [--policy {recency_sink,attention_score}] [--layers LAYERS]
+                                   [--weight-upgrades WEIGHT_UPGRADES] [--kv-upgrades KV_UPGRADES] [--all-upgrades] [--epsilon EPSILON] [--subsample SUBSAMPLE] [--shard SHARD]
+                                   [--num-shards NUM_SHARDS] [--no-eval-cache] [--cache-dir CACHE_DIR] [--results-dir RESULTS_DIR] [--output OUTPUT] [--merge-shards JSON [JSON ...]]
+                                   [--dry-run] [--quiet]
+submodularity_diagnostic.py: error: The cached snapshot for 'allenai/OLMoE-1B-7B-0924' (revision 'main', commit 6d84c48581ece794365f2b8e9cfb043c68ade9c5) is incomplete: 3 file(s) are missing (.gitattributes, README.md, olmoe-logo.png). Outgoing traffic is disabled ('local_files_only=True'). Re-run the download with network access to complete the snapshot.
