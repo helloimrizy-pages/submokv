@@ -28,7 +28,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("HF_HOME", str(REPOSITORY_ROOT / ".hf-cache"))
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from submokv.cli import load_config  # noqa: E402
+from submokv.cli import load_config, resolve_model_path  # noqa: E402
 from submokv.ground_set import GroundSet  # noqa: E402
 from submokv.records import environment, git_commit  # noqa: E402
 from submokv.submodularity import (  # noqa: E402
@@ -121,7 +121,7 @@ def _apply_overrides(config: dict[str, Any], args: argparse.Namespace) -> dict[s
 
 
 def _resolve_snapshot(
-    model_name: str,
+    config: dict[str, Any],
     model_path: Path | None,
     local_files_only: bool,
 ) -> str:
@@ -129,9 +129,17 @@ def _resolve_snapshot(
         if not model_path.exists():
             raise FileNotFoundError(f"model path does not exist: {model_path}")
         return str(model_path)
+    if local_files_only:
+        # snapshot_download regards a deliberately filtered snapshot as
+        # incomplete when non-runtime repository files (README, logo, git
+        # attributes) were omitted. resolve_model_path falls back to the
+        # concrete cached revision, which from_pretrained and the checkpoint
+        # master store can load directly. verify_device exercises that exact
+        # path before an experiment is allowed to run.
+        return resolve_model_path(config, None)
     from huggingface_hub import snapshot_download
 
-    return snapshot_download(model_name, local_files_only=local_files_only)
+    return snapshot_download(config["model"]["name"])
 
 
 def _default_output_path(results_dir: Path, suffix: str = "") -> Path:
@@ -328,7 +336,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         snapshot = _resolve_snapshot(
-            ground.model.name, args.model_path, args.local_files_only
+            config, args.model_path, args.local_files_only
         )
         from submokv.utility import build_utility
 
