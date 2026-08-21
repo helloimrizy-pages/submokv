@@ -62,6 +62,8 @@ runtime:
 
 submodularity:
   test_layers: [2, 10, 18, 26]
-  weight_upgrades: [[2, 4]]
+  # Must name tiers that ground_set.weight_tiers / kv_tiers contain.
+  weight_upgrades: [[3, 4]]
   kv_upgrades: [[0.25, 0.50]]
   epsilon_ppl: 0.01
+  epsilon_source: "UNMEASURED placeholder, pending Milestone 3b Task B"

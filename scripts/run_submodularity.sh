@@ -9,8 +9,11 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
 
 GPUS="${GPUS:-2}"
-SEQUENCES="${SEQUENCES:-64}"
-SEQUENCE_LENGTH="${SEQUENCE_LENGTH:-2048}"
+# Unset means "whatever the config pins". These used to default to 64 x 2048,
+# which silently moved the experiment off the 4096-token train windows the
+# config declares and the noise floor was measured on.
+SEQUENCES="${SEQUENCES:-}"
+SEQUENCE_LENGTH="${SEQUENCE_LENGTH:-}"
 CONFIG="${CONFIG:-configs/olmoe.yaml}"
 STORE="${STORE:-checkpoint}"
 RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -38,7 +41,11 @@ fi
 
 mkdir -p logs results cache
 
-echo "== Sub-MoKV diagnostic: $GPUS GPU shard(s), $SEQUENCES x $SEQUENCE_LENGTH tokens =="
+CALIBRATION_ARGS=()
+[[ -n "$SEQUENCES" ]] && CALIBRATION_ARGS+=(--sequences "$SEQUENCES")
+[[ -n "$SEQUENCE_LENGTH" ]] && CALIBRATION_ARGS+=(--sequence-length "$SEQUENCE_LENGTH")
+
+echo "== Sub-MoKV diagnostic: $GPUS GPU shard(s), calibration: ${CALIBRATION_ARGS[*]:-from $CONFIG} =="
 echo "== config: $CONFIG | master store: $STORE | run: $RUN_ID =="
 
 pids=()
@@ -53,8 +60,7 @@ for ((shard = 0; shard < GPUS; shard++)); do
         --device "cuda:$shard" \
         --master-store "$STORE" \
         --local-files-only \
-        --sequences "$SEQUENCES" \
-        --sequence-length "$SEQUENCE_LENGTH" \
+        ${CALIBRATION_ARGS[@]+"${CALIBRATION_ARGS[@]}"} \
         --shard "$shard" \
         --num-shards "$GPUS" \
         --output "$output" \

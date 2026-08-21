@@ -206,9 +206,93 @@ def _run_diagnostic(args: argparse.Namespace, config: dict[str, Any]) -> None:
             )
         elif args.command == "diagnostic-2":
             entry.payload["diagnostic_2"] = diagnostic_2_interaction(utility, args.budget)
+        elif args.command == "second-order-floor":
+            entry.payload["second_order_floor"] = _second_order_floor(args, utility)
         entry.payload["setup"] = utility.describe()
         entry.payload["ground_set"] = utility.ground_set.describe()
         entry.payload["evaluation_count"] = utility.evaluation_count
+
+
+def _second_order_floor(args: argparse.Namespace, utility: Any) -> dict[str, Any]:
+    """Measure the spread of the second-order difference and print the epsilon it implies."""
+    import sys
+
+    from .submodularity import (
+        MODALITY_LABELS,
+        TierLadders,
+        default_floor_specs,
+        epsilon_from_floor,
+        format_second_order_floor,
+        parse_upgrades,
+        second_order_noise_floor,
+    )
+    from .submodularity import KV as KV_KIND
+    from .submodularity import WEIGHT as WEIGHT_KIND
+
+    target, conditioning = (int(part) for part in args.layers.split(","))
+    ladders = TierLadders.from_ground_set(utility.ground_set)
+    weight_move = parse_upgrades(args.weight_move, WEIGHT_KIND)[0] if args.weight_move else None
+    kv_move = parse_upgrades(args.kv_move, KV_KIND)[0] if args.kv_move else None
+    specs = default_floor_specs(ladders, target, conditioning, weight_move, kv_move)
+
+    def progress(index: int, total: int, plan: Any, subsample: int) -> None:
+        state = plan.compact_dict()
+        print(
+            f"[state {index:>2}/{total}] subsample {subsample} | "
+            f"w={state['weight_bits']} kv={state['kv_retention']}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    floor = second_order_noise_floor(
+        utility, specs, num_subsamples=args.subsamples, progress=progress
+    )
+    # The tolerance a run classifies against is recorded next to the floor it
+    # came from, in both readings, so the choice is visible rather than implied.
+    single = epsilon_from_floor(floor, subsamples_per_cell=1)
+    binding = epsilon_from_floor(floor, subsamples_per_cell=args.cell_subsamples)
+    floor["epsilon"] = {
+        "binding": "mean_of_k",
+        "rule": (
+            "DECISION.md Amendment 1 (2026-08-21): epsilon(modality) = sigma2(modality) / "
+            "sqrt(k), where k is the number of calibration subsamples averaged into one "
+            "reported cell by the run being classified"
+        ),
+        "cell_subsamples": args.cell_subsamples,
+        "mean_of_k": binding.as_dict(),
+        "single_draw": {
+            **single.as_dict(),
+            "note": (
+                "the raw measured sigma2, kept for reference; superseded as the tolerance "
+                "by Amendment 1"
+            ),
+        },
+        "config_yaml": {
+            "epsilon_ppl": dict(binding.by_modality),
+            "epsilon_source": binding.source,
+            "epsilon_cell_subsamples": args.cell_subsamples,
+        },
+    }
+    print(format_second_order_floor(floor))
+    print()
+    print(
+        f"Binding tolerance (DECISION.md Amendment 1): sigma2 / sqrt({args.cell_subsamples})"
+    )
+    print("Paste into configs/*.yaml under submodularity:")
+    print("  epsilon_ppl:")
+    for modality, value in sorted(binding.by_modality):
+        print(
+            f"    {modality}: {value:.6f}   # {MODALITY_LABELS[modality]}, "
+            f"sigma2 {single.for_modality(modality):.6f}"
+        )
+    print(f'  epsilon_source: "{binding.source}"')
+    print(f"  epsilon_cell_subsamples: {args.cell_subsamples}")
+    print()
+    print(
+        f"The matrix run MUST then use exactly {args.cell_subsamples} subsamples per cell; "
+        "a different count invalidates this tolerance."
+    )
+    return floor
 
 
 def _merge_shards(args: argparse.Namespace, config: dict[str, Any]) -> None:
@@ -266,6 +350,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ("diagnostic-0", "sensitivity spread, per layer and per expert"),
         ("diagnostic-1", "achievable headroom across random feasible allocations"),
         ("diagnostic-2", "interaction between the weight and KV axes"),
+        (
+            "second-order-floor",
+            "spread of the second-order difference, which is what epsilon is set from",
+        ),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("--model-path", type=Path, default=None)
@@ -305,6 +393,41 @@ def main(argv: Sequence[str] | None = None) -> int:
             sub.add_argument("--budget", type=float, default=0.35)
         if name == "diagnostic-1":
             sub.add_argument("--samples", type=int, default=30)
+        if name == "second-order-floor":
+            sub.add_argument(
+                "--subsamples",
+                type=int,
+                default=6,
+                help="non-overlapping calibration draws per square; at least five",
+            )
+            sub.add_argument(
+                "--layers",
+                type=str,
+                default="8,4",
+                help="TARGET,CONDITIONING layer indices for the two intra-component squares",
+            )
+            sub.add_argument(
+                "--weight-move",
+                type=str,
+                default=None,
+                help="FROM:TO weight step to measure the floor on (default: ladder bottom step)",
+            )
+            sub.add_argument(
+                "--kv-move",
+                type=str,
+                default=None,
+                help="FROM:TO retention step to measure the floor on (default: ladder bottom step)",
+            )
+            sub.add_argument(
+                "--cell-subsamples",
+                type=int,
+                default=3,
+                help=(
+                    "k, the number of draws the calibrated run averages into one cell; "
+                    "epsilon is sigma2/sqrt(k) per DECISION.md Amendment 1, and the "
+                    "calibrated run must use exactly this many"
+                ),
+            )
 
     merge = subparsers.add_parser("merge", help="combine shard records into one result")
     merge.add_argument("--name", type=str, required=True, help="diagnostic_0 or diagnostic_1")

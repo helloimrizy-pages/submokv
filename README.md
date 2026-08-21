@@ -56,7 +56,7 @@ OLMoE). Rerunning the same command resumes from per-shard evaluation caches.
 Useful overrides:
 
 ```bash
-# Every adjacent weight/KV tier upgrade (112 interactions):
+# Every adjacent move on the ground set's weight/KV ladders (96 interactions):
 GPUS=2 scripts/run_submodularity.sh --all-upgrades
 
 # Inspect the matrix without loading weights or data:
@@ -69,3 +69,54 @@ GPUS=2 scripts/run_submodularity.sh --all-upgrades
 
 The default OLMoE grid is `[2, 6, 10, 14]` because OLMoE has 16 decoder
 layers. The optional 32-layer Mixtral grid is `[2, 10, 18, 26]`.
+
+The tier ladders come from `ground_set.weight_tiers` and `ground_set.kv_tiers`
+in the config, and from nowhere else. A requested transition that names a tier
+the ground set does not contain is refused with an error naming the ladder;
+pass `--allow-outside-ground-set` to record such a probe anyway, in which case
+every affected row is labelled `in_ground_set: false`.
+
+The report separates three tests that were previously mixed: the **epsilon
+test** is the headline and is what the Classification column shows, the
+**strict sign test** is a labelled secondary line, and the **resolution test**
+reports how many cells cleared epsilon in either direction at all. A cell
+inside epsilon is not counted as submodular evidence.
+
+The paper decision rules for Milestone 3b are fixed in `DECISION.md` and are not
+amended by any verdict the tool prints.
+
+## The second-order noise floor
+
+Epsilon is not a constant. The quantity the submodularity test classifies is
+the second-order difference
+
+```text
+D = [F(S_A + j) - F(S_A)] - [F(S_B + j) - F(S_B)]
+  = [PPL(S_A) - PPL(S_A+j)] - [PPL(S_B) - PPL(S_B+j)]
+```
+
+so the floor it must clear is the spread of `D` itself, not the spread of one
+perplexity and not the spread of one delta. The full-precision reference
+cancels out of `D`, so no reference evaluation is needed to measure it.
+
+```bash
+.venv/bin/python -m submokv.cli second-order-floor --subsamples 6 --layers 8,4
+```
+
+This evaluates all four corners of one square per modality on the same
+calibration subsample, repeats that over non-overlapping subsamples, and reports
+the stdev per modality with a chi-square interval. Weight-side and KV-side
+scales differ by roughly a factor of seven, so the result is four numbers, not
+one. It prints the YAML to paste under `submodularity.epsilon_ppl`, and every
+classification the diagnostic later writes carries the `epsilon_used` and
+`epsilon_source` it was compared against.
+
+Evaluation order is plan-major: every subsample of one allocation is scored
+before the next allocation is installed, because installing one costs a
+checkpoint read and a requantization of each changed layer while changing the
+subsample costs nothing.
+
+**The floor and the run it calibrates must read the same windows.** All
+calibration flags now default to the config rather than to a flag constant, so
+`--sequence-length` and `--calibration-split` no longer silently move an
+experiment off the windows its floor was measured on.

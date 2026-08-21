@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run the standalone Sub-MoKV pairwise submodularity diagnostic.
 
-The default OLMoE run evaluates 32 interactions over four representative
-layers, 64 fixed WikiText validation windows of 2,048 tokens, 2->4 bit target
-upgrades, and 25%->50% KV target upgrades.  Use ``--all-upgrades`` to expand
-the same layer grid over every adjacent tier transition.
+The tier ladders come from the ground set the config declares, so a probe of a
+tier the allocator cannot buy is refused rather than silently reported.  Target
+and conditioning transitions default to that ladder; ``--all-upgrades`` expands
+the layer grid over every adjacent move on it.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 # Deterministic CUDA matmuls require this variable to exist before torch is
 # imported.  Respect an explicit setting made by the caller.
@@ -34,6 +34,9 @@ from submokv.records import environment, git_commit  # noqa: E402
 from submokv.submodularity import (  # noqa: E402
     KV,
     WEIGHT,
+    EpsilonPolicy,
+    OutsideGroundSetError,
+    TierLadders,
     adjacent_upgrades,
     build_interaction_matrix,
     format_diagnostic_report,
@@ -57,8 +60,15 @@ def _parse_layers(text: str) -> tuple[int, ...]:
     return layers
 
 
-def _configured_upgrades(config: dict[str, Any], key: str, fallback: str) -> str:
-    value = config.get("submodularity", {}).get(key, fallback)
+def _configured_upgrades(config: dict[str, Any], key: str) -> str | None:
+    """Return the configured transitions as a FROM:TO string, or None if unset.
+
+    None means "use the ground set's ladder", which is the only default; there
+    is deliberately no hardcoded tier list here.
+    """
+    value = config.get("submodularity", {}).get(key)
+    if value is None:
+        return None
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -71,6 +81,33 @@ def _configured_upgrades(config: dict[str, Any], key: str, fallback: str) -> str
     raise ValueError(f"submodularity.{key} must be a transition string or list of pairs")
 
 
+def _resolve_epsilon(args: argparse.Namespace, config: dict[str, Any]) -> EpsilonPolicy:
+    """Return the classification tolerance, per modality where one is configured.
+
+    ``submodularity.epsilon_ppl`` accepts either a bare number or a mapping from
+    modality to tolerance. The mapping is what a measured second-order noise
+    floor produces, because the weight and KV scales differ by roughly a factor
+    of seven and one constant cannot serve both.
+    """
+    if args.epsilon is not None:
+        return EpsilonPolicy.uniform(float(args.epsilon), "command line --epsilon")
+    configured = config.get("submodularity", {}).get("epsilon_ppl")
+    if configured is None:
+        raise ValueError(
+            "no epsilon is configured; set submodularity.epsilon_ppl in the config or pass "
+            "--epsilon. It must come from a measured second-order noise floor, not a guess."
+        )
+    if isinstance(configured, Mapping):
+        source = str(
+            config.get("submodularity", {}).get("epsilon_source", "config mapping")
+        )
+        return EpsilonPolicy.from_mapping(configured, source)
+    source = str(
+        config.get("submodularity", {}).get("epsilon_source", "config constant")
+    )
+    return EpsilonPolicy.uniform(float(configured), source)
+
+
 def _apply_overrides(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     updated = copy.deepcopy(config)
     calibration = updated.setdefault("calibration", {})
@@ -79,12 +116,18 @@ def _apply_overrides(config: dict[str, Any], args: argparse.Namespace) -> dict[s
     runtime = updated.setdefault("runtime", {})
     retention = updated.setdefault("retention", {})
 
+    # Every calibration setting defaults to the config. A run whose noise floor
+    # was measured at one sequence length and split cannot be classified against
+    # a floor measured at another, and the previous defaults silently moved a
+    # 4096-token train-split experiment onto 2048-token validation windows.
     old_length = int(calibration.get("sequence_length", kv.get("context_length", 2048)))
     old_prefill = int(protocol.get("prefill_tokens", max(1, 3 * old_length // 4)))
-    new_length = int(args.sequence_length)
+    new_length = old_length if args.sequence_length is None else int(args.sequence_length)
     calibration["sequence_length"] = new_length
-    calibration["cheap_sequences"] = int(args.sequences)
-    calibration["calibration_split"] = args.calibration_split
+    if args.sequences is not None:
+        calibration["cheap_sequences"] = int(args.sequences)
+    if args.calibration_split is not None:
+        calibration["calibration_split"] = args.calibration_split
     kv["context_length"] = new_length
 
     if args.batch_size is not None:
@@ -108,13 +151,14 @@ def _apply_overrides(config: dict[str, Any], args: argparse.Namespace) -> dict[s
             f"prefill_tokens must be in [0, {new_length - 1}], got {protocol['prefill_tokens']}"
         )
     batch_size = int(kv.get("batch_size", 1))
-    if args.sequences < batch_size:
+    sequences = int(calibration["cheap_sequences"])
+    if sequences < batch_size:
         raise ValueError(
-            f"sequences ({args.sequences}) must be at least the KV batch size ({batch_size})"
+            f"sequences ({sequences}) must be at least the KV batch size ({batch_size})"
         )
-    if args.sequences % batch_size:
+    if sequences % batch_size:
         raise ValueError(
-            f"sequences ({args.sequences}) must be divisible by the KV batch size "
+            f"sequences ({sequences}) must be divisible by the KV batch size "
             f"({batch_size}); the evaluator intentionally refuses a differently sized final batch"
         )
     return updated
@@ -171,9 +215,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="fail instead of downloading a missing Hugging Face snapshot",
     )
 
-    parser.add_argument("--sequences", type=int, default=64)
-    parser.add_argument("--sequence-length", type=int, choices=(2048, 4096), default=2048)
-    parser.add_argument("--calibration-split", type=str, default="validation")
+    parser.add_argument(
+        "--sequences",
+        type=int,
+        default=None,
+        help="override calibration.cheap_sequences; defaults to the config",
+    )
+    parser.add_argument(
+        "--sequence-length",
+        type=int,
+        choices=(2048, 4096),
+        default=None,
+        help="override calibration.sequence_length; defaults to the config",
+    )
+    parser.add_argument(
+        "--calibration-split",
+        type=str,
+        default=None,
+        help="override calibration.calibration_split; defaults to the config",
+    )
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--prefill-tokens", type=int, default=None)
     parser.add_argument("--chunk-size", type=int, default=None)
@@ -198,9 +258,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="comma-separated FROM:TO retention probes, e.g. 0.25:0.5,0.5:1",
     )
     parser.add_argument(
+        "--weight-conditioning",
+        type=str,
+        default=None,
+        help="single FROM:TO weight move used as the conditioning component, e.g. 3:4",
+    )
+    parser.add_argument(
+        "--kv-conditioning",
+        type=str,
+        default=None,
+        help="single FROM:TO retention move used as the conditioning component",
+    )
+    parser.add_argument(
         "--all-upgrades",
         action="store_true",
-        help="test every adjacent weight and KV ladder move (112 rows for four layers)",
+        help="test every adjacent move on the ground set's weight and KV ladders",
+    )
+    parser.add_argument(
+        "--allow-outside-ground-set",
+        action="store_true",
+        help=(
+            "record probes of tiers the allocator cannot buy instead of refusing them; "
+            "affected rows are labelled in_ground_set: false"
+        ),
     )
     parser.add_argument("--epsilon", type=float, default=None, help="PPL tolerance")
     parser.add_argument("--subsample", type=int, default=0)
@@ -253,7 +333,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"JSON log: {output.resolve()}")
         return 0
 
-    if args.sequences <= 0:
+    if args.sequences is not None and args.sequences <= 0:
         parser.error("--sequences must be positive")
     if args.subsample < 0:
         parser.error("--subsample must be non-negative")
@@ -280,29 +360,62 @@ def main(argv: Sequence[str] | None = None) -> int:
             requested_layers = (2, 10, 18, 26)
         layers = validate_test_layers(requested_layers, ground.model.num_hidden_layers)
 
+        # The ground set is the single source of truth for which tiers exist.
+        ladders = TierLadders.from_ground_set(ground)
+
         if args.all_upgrades:
-            weight_upgrades = adjacent_upgrades(WEIGHT)
-            kv_upgrades = adjacent_upgrades(KV)
+            weight_upgrades = adjacent_upgrades(WEIGHT, ladders)
+            kv_upgrades = adjacent_upgrades(KV, ladders)
         else:
             weight_text = args.weight_upgrades or _configured_upgrades(
-                config, "weight_upgrades", "2:4"
+                config, "weight_upgrades"
             )
-            kv_text = args.kv_upgrades or _configured_upgrades(
-                config, "kv_upgrades", "0.25:0.50"
+            kv_text = args.kv_upgrades or _configured_upgrades(config, "kv_upgrades")
+            weight_upgrades = (
+                parse_upgrades(weight_text, WEIGHT) if weight_text else None
             )
-            weight_upgrades = parse_upgrades(weight_text, WEIGHT)
-            kv_upgrades = parse_upgrades(kv_text, KV)
-        interactions = build_interaction_matrix(layers, weight_upgrades, kv_upgrades)
+            kv_upgrades = parse_upgrades(kv_text, KV) if kv_text else None
+
+        conditioning_text = args.weight_conditioning or _configured_upgrades(
+            config, "weight_conditioning"
+        )
+        kv_conditioning_text = args.kv_conditioning or _configured_upgrades(
+            config, "kv_conditioning"
+        )
+        weight_conditioning = (
+            parse_upgrades(conditioning_text, WEIGHT)[0] if conditioning_text else None
+        )
+        kv_conditioning = (
+            parse_upgrades(kv_conditioning_text, KV)[0] if kv_conditioning_text else None
+        )
+
+        interactions = build_interaction_matrix(
+            layers,
+            ladders,
+            weight_upgrades,
+            kv_upgrades,
+            weight_conditioning=weight_conditioning,
+            kv_conditioning=kv_conditioning,
+        )
+        offenders = sorted(
+            {
+                move.label
+                for spec in interactions
+                for move in (spec.target, spec.conditioning)
+                if not ladders.contains(move)
+            }
+        )
+        if offenders and not args.allow_outside_ground_set:
+            raise OutsideGroundSetError(
+                f"requested move(s) {', '.join(offenders)} are outside the ground set's "
+                f"ladders weight={list(ladders.weight_tiers)} kv={list(ladders.kv_tiers)}. "
+                "Fix configs/*.yaml or the --weight-upgrades/--kv-upgrades flags, or pass "
+                "--allow-outside-ground-set to record them labelled in_ground_set: false."
+            )
         shard_interactions = tuple(
             spec for index, spec in enumerate(interactions) if index % args.num_shards == args.shard
         )
-        epsilon = float(
-            args.epsilon
-            if args.epsilon is not None
-            else config.get("submodularity", {}).get("epsilon_ppl", 0.01)
-        )
-        if epsilon < 0:
-            raise ValueError(f"epsilon must be non-negative, got {epsilon}")
+        epsilon = _resolve_epsilon(args, config)
     except (KeyError, TypeError, ValueError) as error:
         parser.error(str(error))
 
@@ -313,7 +426,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "model": ground.model.name,
                     "num_hidden_layers": ground.model.num_hidden_layers,
                     "test_layers": list(layers),
-                    "epsilon_ppl": epsilon,
+                    "tier_ladders": ladders.describe(),
+                    "epsilon_ppl": epsilon.as_dict(),
                     "calibration": {
                         "dataset": config["calibration"]["dataset"],
                         "subset": config["calibration"]["subset"],
@@ -327,7 +441,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "shard": args.shard,
                     "num_shards": args.num_shards,
                     "num_shard_interactions": len(shard_interactions),
-                    "interactions": matrix_as_dict(shard_interactions),
+                    "interactions": matrix_as_dict(shard_interactions, ladders),
                 },
                 indent=2,
             )
@@ -361,6 +475,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         epsilon=epsilon,
         subsample=args.subsample,
         use_cache=not args.no_eval_cache,
+        allow_outside_ground_set=args.allow_outside_ground_set,
         progress=progress,
     )
     report["provenance"] = {

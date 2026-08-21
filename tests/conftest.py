@@ -103,9 +103,12 @@ def tiny_kv() -> KVSpec:
     return KVSpec(context_length=16, batch_size=1, dtype_bytes=2, sink_tokens=2)
 
 
-@pytest.fixture
-def tiny_utility(tiny_model):
-    """Return a utility function over the tiny model, wired exactly as the real one is."""
+def _tiny_utility(model, cheap_sequences: int = 2, pool_windows: int = 10):
+    """Build a utility over the tiny model, wired exactly as the real one is.
+
+    ``pool_windows`` sizes the calibration pool, which is what bounds how many
+    non-overlapping subsamples a noise floor can be measured over.
+    """
     import torch
 
     from submokv.kvcache import EvaluationProtocol, RecencySinkPolicy, RetentionController
@@ -127,16 +130,31 @@ def tiny_utility(tiny_model):
     quant = QuantSpec(group_size=8, scale_bits=16, zero_point_bits=0)
     ground = GroundSet(model_spec, kv, quant)
 
-    spec = CalibrationSpec(sequence_length=16, cheap_sequences=2, full_sequences=4, seed=0)
+    spec = CalibrationSpec(
+        sequence_length=16, cheap_sequences=cheap_sequences, full_sequences=4, seed=0
+    )
     generator = torch.Generator().manual_seed(5)
-    pool = torch.randint(0, TINY_ARCHITECTURE["vocab_size"], (10, 16), generator=generator)
-    store = SequenceStore.from_windows(pool[:6], pool[6:], spec)
+    total = pool_windows + 4
+    pool = torch.randint(0, TINY_ARCHITECTURE["vocab_size"], (total, 16), generator=generator)
+    store = SequenceStore.from_windows(pool[:pool_windows], pool[pool_windows:], spec)
 
-    quantizer = ExpertQuantizer(tiny_model, quant)
+    quantizer = ExpertQuantizer(model, quant)
     controller = RetentionController(
-        tiny_model,
+        model,
         RecencySinkPolicy(sink_tokens=2),
         kv,
         EvaluationProtocol(prefill_tokens=8, chunk_size=4),
     ).attach()
-    return UtilityFunction(tiny_model, ground, quantizer, controller, store, device="cpu")
+    return UtilityFunction(model, ground, quantizer, controller, store, device="cpu")
+
+
+@pytest.fixture
+def tiny_utility(tiny_model):
+    """Return a utility over the tiny model with a six-window calibration pool."""
+    return _tiny_utility(tiny_model, cheap_sequences=2, pool_windows=6)
+
+
+@pytest.fixture
+def tiny_utility_wide(tiny_model):
+    """Return a tiny utility whose pool holds enough draws to measure a spread."""
+    return _tiny_utility(tiny_model, cheap_sequences=1, pool_windows=8)

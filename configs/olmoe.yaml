@@ -102,8 +102,20 @@ submodularity:
   # valid here. These four indices cover early, early-middle, late-middle, and
   # late OLMoE blocks without silently clipping a requested layer.
   test_layers: [2, 6, 10, 14]
+  # Target transitions. Every tier named here must appear in
+  # ground_set.weight_tiers / ground_set.kv_tiers; the ground set is the single
+  # source of truth and a move off its ladder is refused. 2 bits was removed
+  # from the search space, so a 2->4 target is no longer a legal probe here.
   # One transition per resource ladder gives 32 directed/cross interactions.
-  # The script accepts comma-separated alternatives or --all-upgrades.
-  weight_upgrades: [[2, 4]]
+  weight_upgrades: [[3, 4]]
   kv_upgrades: [[0.25, 0.50]]
+  # Conditioning transitions. Unset means bottom-to-top of the ground set's
+  # ladder, which is 3->16 for weights and 0.25->1.00 for KV.
+  # weight_conditioning: [[3, 4]]
+  # kv_conditioning: [[0.25, 0.50]]
+  # PLACEHOLDER. This is the old hardcoded default and it was never measured.
+  # Milestone 3b Task B replaces it with the measured stdev of the second-order
+  # difference, one value per modality. Do not read a classification made
+  # against this number as a result.
   epsilon_ppl: 0.01
+  epsilon_source: "UNMEASURED placeholder, pending Milestone 3b Task B"
