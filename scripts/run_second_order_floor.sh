@@ -23,7 +23,9 @@ cd "$REPO_DIR"
 DEVICE="${DEVICE:-cuda:0}"
 SUBSAMPLES="${SUBSAMPLES:-6}"
 LAYERS="${LAYERS:-8,4}"
-STORE="${STORE:-memory}"
+# Plan-major evaluation installs each allocation once, so the checkpoint store
+# is cheap here and leaves the 12 GiB the memory store would hold to the cache.
+STORE="${STORE:-checkpoint}"
 CONFIG="${CONFIG:-configs/olmoe.yaml}"
 SEQUENCES="${SEQUENCES:-}"
 RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
